@@ -117,6 +117,18 @@ function bindTouchEvents() {
   }, { passive: false });
 }
 
+// ---- Random 3D position (ephemeral, not persisted) ----
+function randomPos() {
+  return {
+    pos_x: (Math.random() * 7600) - 3800,
+    pos_y: (Math.random() * 3200) - 1600,
+    pos_z: -800 - Math.random() * 8200,
+    rot_x: (Math.random() * 36)   - 18,
+    rot_y: (Math.random() * 36)   - 18,
+    rot_z: (Math.random() * 44)   - 22,
+  };
+}
+
 // ---- Photos ----
 let photos = [];
 
@@ -161,9 +173,11 @@ function renderPhotoCard(photo) {
   card.dataset.id     = photo.id;
   card.dataset.tags   = photo.tags  || '';
   card.dataset.title  = photo.title || '';
+
+  const pos = randomPos();
   card.style.transform =
-    `translate3d(${photo.pos_x}px,${photo.pos_y}px,${photo.pos_z}px) ` +
-    `rotateX(${photo.rot_x}deg) rotateY(${photo.rot_y}deg) rotateZ(${photo.rot_z}deg)`;
+    `translate3d(${pos.pos_x}px,${pos.pos_y}px,${pos.pos_z}px) ` +
+    `rotateX(${pos.rot_x}deg) rotateY(${pos.rot_y}deg) rotateZ(${pos.rot_z}deg)`;
 
   card.innerHTML = `
     <img src="${escHtml(photo.url)}" alt="${escHtml(photo.title)}" loading="lazy" draggable="false">
@@ -244,7 +258,8 @@ function filterPhotos(query) {
 // ---- Lightbox ----
 const lb = {
   overlay: null, img: null, title: null, tagsEl: null,
-  currentUrl: '', currentTitle: '',
+  currentUrl: '', currentTitle: '', currentId: null,
+  tags: [],
 };
 
 function initLightbox() {
@@ -269,24 +284,15 @@ function initLightbox() {
 }
 
 function openLightbox(photo) {
-  lb.img.src         = photo.url;
-  lb.img.alt         = photo.title || '';
+  lb.img.src           = photo.url;
+  lb.img.alt           = photo.title || '';
   lb.title.textContent = photo.title || '';
-  lb.currentUrl      = photo.url;
-  lb.currentTitle    = photo.title || 'foto';
+  lb.currentUrl        = photo.url;
+  lb.currentTitle      = photo.title || 'foto';
+  lb.currentId         = photo.id;
+  lb.tags              = (photo.tags || '').split(',').map(t => t.trim()).filter(Boolean);
 
-  if (lb.tagsEl) {
-    lb.tagsEl.innerHTML = '';
-    const tags = (photo.tags || '').split(',').map(t => t.trim()).filter(Boolean);
-    tags.forEach(tag => {
-      const pill = document.createElement('span');
-      pill.className   = 'lb-tag-pill';
-      pill.textContent = tag;
-      lb.tagsEl.appendChild(pill);
-    });
-    lb.tagsEl.style.display = tags.length ? 'flex' : 'none';
-  }
-
+  renderLightboxTags();
   lb.overlay.classList.add('open');
   document.body.style.overflow = 'hidden';
 }
@@ -295,6 +301,106 @@ function closeLightbox() {
   lb.overlay.classList.remove('open');
   document.body.style.overflow = '';
   setTimeout(() => { lb.img.src = ''; }, 350);
+}
+
+// ---- Lightbox tag editing ----
+function renderLightboxTags() {
+  if (!lb.tagsEl) return;
+  lb.tagsEl.innerHTML = '';
+
+  lb.tags.forEach((tag, i) => {
+    lb.tagsEl.appendChild(makePill(tag, i));
+  });
+
+  const addBtn = document.createElement('button');
+  addBtn.className   = 'lb-tag-add';
+  addBtn.type        = 'button';
+  addBtn.textContent = '+';
+  addBtn.title       = 'Añadir etiqueta';
+  addBtn.addEventListener('click', () => {
+    lb.tags.push('');
+    renderLightboxTags();
+    const pills = lb.tagsEl.querySelectorAll('.lb-tag-pill');
+    if (pills.length) startEditPill(pills[pills.length - 1], lb.tags.length - 1);
+  });
+  lb.tagsEl.appendChild(addBtn);
+
+  lb.tagsEl.style.display = 'flex';
+}
+
+function makePill(tag, idx) {
+  const pill = document.createElement('span');
+  pill.className = 'lb-tag-pill';
+
+  const label = document.createElement('span');
+  label.className   = 'lb-pill-label';
+  label.textContent = tag;
+
+  const removeBtn = document.createElement('button');
+  removeBtn.className   = 'lb-pill-remove';
+  removeBtn.type        = 'button';
+  removeBtn.innerHTML   = '&times;';
+  removeBtn.title       = 'Eliminar etiqueta';
+  removeBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    lb.tags.splice(idx, 1);
+    saveTagsToServer();
+    renderLightboxTags();
+  });
+
+  label.addEventListener('click', () => startEditPill(pill, idx));
+
+  pill.appendChild(label);
+  pill.appendChild(removeBtn);
+  return pill;
+}
+
+function startEditPill(pill, idx) {
+  if (pill.classList.contains('editing')) return;
+  pill.classList.add('editing');
+
+  const label = pill.querySelector('.lb-pill-label');
+  const input = document.createElement('input');
+  input.type      = 'text';
+  input.className = 'lb-pill-input';
+  input.value     = lb.tags[idx] || '';
+  input.maxLength = 60;
+  label.replaceWith(input);
+  input.focus();
+  input.select();
+
+  function commit() {
+    const val = input.value.trim().toLowerCase();
+    if (val) {
+      lb.tags[idx] = val;
+    } else {
+      lb.tags.splice(idx, 1);
+    }
+    saveTagsToServer();
+    renderLightboxTags();
+  }
+
+  input.addEventListener('blur', commit);
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter')  { e.preventDefault(); input.blur(); }
+    if (e.key === 'Escape') { lb.tags = lb.tags.filter(Boolean); renderLightboxTags(); }
+  });
+}
+
+async function saveTagsToServer() {
+  if (lb.currentId === null) return;
+  try {
+    const res = await fetch('api/photos.php', {
+      method:  'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ id: lb.currentId, tags: lb.tags.join(',') }),
+    });
+    if (!res.ok) throw new Error('Error al guardar');
+    const card = document.querySelector(`.photo-card[data-id="${lb.currentId}"]`);
+    if (card) card.dataset.tags = lb.tags.join(',');
+    const photo = photos.find(p => p.id == lb.currentId);
+    if (photo) photo.tags = lb.tags.join(',');
+  } catch(e) { showToast(e.message, 'error'); }
 }
 
 // ---- Upload modal ----
@@ -306,7 +412,6 @@ function initUploadModal() {
   const urlInput  = document.getElementById('photoUrl');
   const preview   = document.getElementById('uploadPreview');
 
-  // Inject SVG folder icon into dropzone
   const dropIcon = dropzone.querySelector('.drop-icon');
   if (dropIcon) dropIcon.innerHTML = SVG.folder;
 

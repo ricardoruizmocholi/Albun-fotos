@@ -83,7 +83,12 @@ $orbs = [
 
 <!-- ---- Gallery header ---- -->
 <div class="gallery-header">
+  <?php if (!empty($album['cover_url'] ?? '')): ?>
+  <img src="<?= htmlspecialchars($album['cover_url'], ENT_QUOTES, 'UTF-8') ?>" alt=""
+       style="width:40px;height:40px;border-radius:50%;object-fit:cover;flex-shrink:0;box-shadow:0 2px 8px rgba(0,0,0,0.15)">
+  <?php else: ?>
   <div style="width:32px;height:32px;border-radius:8px;background:<?= $albumColor ?>;flex-shrink:0"></div>
+  <?php endif; ?>
   <div>
     <div class="gallery-album-name"><?= $albumName ?></div>
     <div class="gallery-photo-count" id="photoCount">Cargando…</div>

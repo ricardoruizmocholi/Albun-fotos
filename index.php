@@ -57,6 +57,48 @@
   </div>
 </div>
 
+<!-- ---- Modal: editar álbum ---- -->
+<div class="modal-overlay" id="editAlbumModal" role="dialog" aria-modal="true" aria-labelledby="editModalTitle">
+  <div class="modal-box">
+    <h2 class="modal-title" id="editModalTitle">Editar álbum</h2>
+    <form id="editAlbumForm" novalidate>
+
+      <div class="form-group">
+        <label for="editAlbumName">Nombre</label>
+        <input id="editAlbumName" class="form-input" type="text" maxlength="120" required autocomplete="off">
+      </div>
+
+      <div class="form-group">
+        <label for="editAlbumColor">Color</label>
+        <input id="editAlbumColor" type="color" class="color-native">
+      </div>
+
+      <div class="form-group">
+        <label>Imagen de portada</label>
+        <div class="cover-tabs">
+          <button type="button" class="cover-tab active" data-tab="url">URL</button>
+          <button type="button" class="cover-tab" data-tab="file">Subir</button>
+        </div>
+        <div class="cover-tab-panel" data-panel="url">
+          <input id="editCoverUrl" class="form-input" type="url" placeholder="https://…" style="margin-top:8px">
+        </div>
+        <div class="cover-tab-panel" data-panel="file" style="display:none;margin-top:8px">
+          <input type="file" id="editCoverFile" accept="image/jpeg,image/png,image/webp" style="display:none">
+          <button type="button" class="btn btn-ghost btn-sm" id="editCoverFileTrigger">Seleccionar archivo</button>
+        </div>
+        <div id="editCoverPreview" style="margin-top:10px;display:none">
+          <img id="editCoverPreviewImg" src="" alt="" style="width:80px;height:60px;object-fit:cover;border-radius:8px;display:block;">
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" id="cancelEditAlbum">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Guardar cambios</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <!-- ---- Toasts ---- -->
 <div class="toast-container" id="toastContainer"></div>
 

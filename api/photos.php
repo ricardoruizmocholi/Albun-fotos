@@ -14,7 +14,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'downloa
         $album = $aStmt->fetch();
         if (!$album) { http_response_code(404); echo 'Álbum no encontrado'; exit; }
 
-        $pStmt = $pdo->prepare('SELECT * FROM photos WHERE album_id = ?');
+        $pStmt = $pdo->prepare('SELECT id, url, title FROM photos WHERE album_id = ?');
         $pStmt->execute([$albumId]);
         $photos = $pStmt->fetchAll();
 
@@ -50,7 +50,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'downloa
             readfile($tmpFile);
             unlink($tmpFile);
         } else {
-            // Fallback: JSON list so the browser can handle downloads individually
             header('Content-Type: application/json; charset=utf-8');
             echo json_encode([
                 'fallback' => true,
@@ -67,7 +66,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'downloa
 // ---- Normal JSON API ----
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET, POST, DELETE, OPTIONS');
+header('Access-Control-Allow-Methods: GET, POST, PATCH, DELETE, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(204); exit; }
@@ -80,26 +79,12 @@ function jsonOut(mixed $data, int $code = 200): never {
     exit;
 }
 
-function random3D(): array {
-    return [
-        'pos_x' => mt_rand(-600, 600),
-        'pos_y' => mt_rand(-300, 300),
-        'pos_z' => mt_rand(-500,  50),
-        'rot_x' => mt_rand(-12,   12) + (mt_rand(0, 9) / 10),
-        'rot_y' => mt_rand(-15,   15) + (mt_rand(0, 9) / 10),
-        'rot_z' => mt_rand(-6,     6) + (mt_rand(0, 9) / 10),
-    ];
-}
-
 function cleanTags(string $raw): string {
     $tags = array_unique(array_filter(array_map('trim', explode(',', strtolower($raw)))));
     return implode(',', $tags);
 }
 
 function castPhoto(array &$r): void {
-    foreach (['pos_x','pos_y','pos_z','rot_x','rot_y','rot_z'] as $f) {
-        $r[$f] = (float) $r[$f];
-    }
     $r['tags'] = $r['tags'] ?? '';
 }
 
@@ -113,7 +98,7 @@ try {
         $albumId = (int) ($_GET['album_id'] ?? 0);
         if ($albumId <= 0) jsonOut(['error' => 'album_id requerido'], 422);
 
-        $stmt = $pdo->prepare('SELECT * FROM photos WHERE album_id = ? ORDER BY created_at ASC');
+        $stmt = $pdo->prepare('SELECT id, album_id, url, title, tags, created_at FROM photos WHERE album_id = ? ORDER BY created_at ASC');
         $stmt->execute([$albumId]);
         $rows = $stmt->fetchAll();
         foreach ($rows as &$r) castPhoto($r);
@@ -155,23 +140,30 @@ try {
             jsonOut(['error' => 'Se requiere archivo o URL'], 422);
         }
 
-        $pos  = random3D();
-        $stmt = $pdo->prepare(
-            'INSERT INTO photos (album_id, url, title, tags, pos_x, pos_y, pos_z, rot_x, rot_y, rot_z)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-        );
-        $stmt->execute([
-            $albumId, $url, $title, $tags,
-            $pos['pos_x'], $pos['pos_y'], $pos['pos_z'],
-            $pos['rot_x'], $pos['rot_y'], $pos['rot_z'],
-        ]);
+        $stmt = $pdo->prepare('INSERT INTO photos (album_id, url, title, tags) VALUES (?, ?, ?, ?)');
+        $stmt->execute([$albumId, $url, $title, $tags]);
         $newId = (int) $pdo->lastInsertId();
 
-        $row = $pdo->prepare('SELECT * FROM photos WHERE id = ?');
+        $row = $pdo->prepare('SELECT id, album_id, url, title, tags, created_at FROM photos WHERE id = ?');
         $row->execute([$newId]);
         $photo = $row->fetch();
         castPhoto($photo);
         jsonOut($photo, 201);
+    }
+
+    // ---- PATCH: actualizar etiquetas ----
+    if ($method === 'PATCH') {
+        $body = json_decode(file_get_contents('php://input'), true) ?? [];
+        $id   = (int) ($body['id'] ?? 0);
+        $tags = cleanTags($body['tags'] ?? '');
+        if ($id <= 0) jsonOut(['error' => 'ID inválido'], 422);
+
+        $row = $pdo->prepare('SELECT id FROM photos WHERE id = ?');
+        $row->execute([$id]);
+        if (!$row->fetch()) jsonOut(['error' => 'Foto no encontrada'], 404);
+
+        $pdo->prepare('UPDATE photos SET tags = ? WHERE id = ?')->execute([$tags, $id]);
+        jsonOut(['ok' => true, 'tags' => $tags]);
     }
 
     // ---- DELETE: borrar foto ----

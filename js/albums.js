@@ -7,6 +7,7 @@
 const SVG = {
   trash:    `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>`,
   download: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`,
+  edit:     `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`,
 };
 
 function showToast(msg, type = 'success') {
@@ -29,6 +30,8 @@ function escHtml(str) {
 const COLORS = ['#0071e3','#ff6b6b','#34c759','#ff9f0a','#bf5af2','#ff375f','#32ade6','#30b0c7','#a2845e','#6c6c70'];
 let selectedColor = '#0071e3';
 let albums = [];
+let editingAlbum = null;
+let editCoverUrl = '';
 
 // ---- DOM refs ----
 const grid      = document.getElementById('albumsGrid');
@@ -56,20 +59,36 @@ function renderAlbums() {
     a.className = 'album-card';
     a.href = `gallery.php?album=${album.id}`;
     a.style.setProperty('--card-color', album.color);
+
+    const coverUrl = album.cover_url || '';
+    const coverHtml = coverUrl
+      ? `<div class="album-cover" style="background-image:url('${escHtml(coverUrl)}')"></div>`
+      : `<div class="album-cover album-cover-gradient" style="background:linear-gradient(135deg,${escHtml(album.color)}4d 0%,#fff 100%)"></div>`;
+
     a.innerHTML = `
-      <div class="album-color-dot" style="background:${escHtml(album.color)}"></div>
-      <div class="album-name">${escHtml(album.name)}</div>
-      <div class="album-count">${album.photo_count} ${album.photo_count === 1 ? 'foto' : 'fotos'}</div>
-      <div class="album-actions">
-        <button class="btn-album-action btn-album-dl" data-id="${album.id}" title="Descargar todo">
-          ${SVG.download} Descargar
-        </button>
-        <button class="btn-album-action btn-album-del" data-id="${album.id}" title="Eliminar álbum">
-          ${SVG.trash} Eliminar
-        </button>
+      ${coverHtml}
+      <div class="album-card-body">
+        <div class="album-color-dot" style="background:${escHtml(album.color)}"></div>
+        <div class="album-name">${escHtml(album.name)}</div>
+        <div class="album-count">${album.photo_count} ${album.photo_count === 1 ? 'foto' : 'fotos'}</div>
+        <div class="album-actions">
+          <button class="btn-album-action btn-album-edit" data-id="${album.id}" title="Editar álbum">
+            ${SVG.edit} Editar
+          </button>
+          <button class="btn-album-action btn-album-dl" data-id="${album.id}" title="Descargar todo">
+            ${SVG.download} Descargar
+          </button>
+          <button class="btn-album-action btn-album-del" data-id="${album.id}" title="Eliminar álbum">
+            ${SVG.trash} Eliminar
+          </button>
+        </div>
       </div>
     `;
 
+    a.querySelector('.btn-album-edit').addEventListener('click', e => {
+      e.preventDefault(); e.stopPropagation();
+      openEditModal(album);
+    });
     a.querySelector('.btn-album-dl').addEventListener('click', e => {
       e.preventDefault(); e.stopPropagation();
       downloadAlbum(album.id, album.name);
@@ -124,7 +143,6 @@ async function downloadAlbum(id, name) {
       setTimeout(() => URL.revokeObjectURL(url), 2000);
       showToast('Descarga iniciada');
     } else {
-      // Fallback: ZipArchive no disponible — descarga fotos individuales
       const data = await res.json();
       if (data.fallback && Array.isArray(data.photos) && data.photos.length > 0) {
         data.photos.forEach((p, i) => {
@@ -146,7 +164,7 @@ async function downloadAlbum(id, name) {
   } catch(e) { showToast(e.message, 'error'); }
 }
 
-// ---- Modal ----
+// ---- Create modal ----
 function openModal() {
   selectedColor = '#0071e3';
   nameInput.value = '';
@@ -174,7 +192,6 @@ function renderColorRow() {
   });
 }
 
-// ---- Create album ----
 modalForm.addEventListener('submit', async e => {
   e.preventDefault();
   const name = nameInput.value.trim();
@@ -204,6 +221,131 @@ modalForm.addEventListener('submit', async e => {
 });
 
 modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeModal(); closeEditModal(); } });
+
+// ---- Edit modal ----
+const editModal     = document.getElementById('editAlbumModal');
+const editForm      = document.getElementById('editAlbumForm');
+const editNameInput = document.getElementById('editAlbumName');
+const editColorInput = document.getElementById('editAlbumColor');
+
+function openEditModal(album) {
+  editingAlbum          = album;
+  editCoverUrl          = album.cover_url || '';
+  editNameInput.value   = album.name;
+  editColorInput.value  = album.color || '#0071e3';
+
+  // Reset cover tabs & preview
+  switchCoverTab('url');
+  document.getElementById('editCoverUrl').value = editCoverUrl;
+  document.getElementById('editCoverFile').value = '';
+  updateCoverPreview(editCoverUrl);
+
+  editModal.classList.add('open');
+  requestAnimationFrame(() => editNameInput.focus());
+}
+
+function closeEditModal() {
+  editModal.classList.remove('open');
+  editingAlbum = null;
+}
+
+document.getElementById('cancelEditAlbum').addEventListener('click', closeEditModal);
+editModal.addEventListener('click', e => { if (e.target === editModal) closeEditModal(); });
+
+// Cover tabs
+function switchCoverTab(tab) {
+  document.querySelectorAll('.cover-tab').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tab === tab);
+  });
+  document.querySelectorAll('.cover-tab-panel').forEach(panel => {
+    panel.style.display = panel.dataset.panel === tab ? 'block' : 'none';
+  });
+}
+
+document.querySelectorAll('.cover-tab').forEach(btn => {
+  btn.addEventListener('click', () => switchCoverTab(btn.dataset.tab));
+});
+
+// Cover URL input
+document.getElementById('editCoverUrl').addEventListener('input', e => {
+  editCoverUrl = e.target.value.trim();
+  updateCoverPreview(editCoverUrl);
+});
+
+// Cover file upload
+const editCoverFile    = document.getElementById('editCoverFile');
+const editCoverTrigger = document.getElementById('editCoverFileTrigger');
+
+editCoverTrigger.addEventListener('click', () => editCoverFile.click());
+
+editCoverFile.addEventListener('change', async () => {
+  const file = editCoverFile.files[0];
+  if (!file) return;
+  editCoverTrigger.textContent = 'Subiendo…';
+  editCoverTrigger.disabled = true;
+  try {
+    const fd = new FormData();
+    fd.append('cover', file);
+    const res  = await fetch('api/albums.php?action=upload_cover', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error ?? 'Error al subir');
+    editCoverUrl = data.url;
+    updateCoverPreview(editCoverUrl);
+    showToast('Portada subida');
+  } catch(err) {
+    showToast(err.message, 'error');
+  } finally {
+    editCoverTrigger.textContent = 'Seleccionar archivo';
+    editCoverTrigger.disabled = false;
+  }
+});
+
+function updateCoverPreview(url) {
+  const preview = document.getElementById('editCoverPreview');
+  const img     = document.getElementById('editCoverPreviewImg');
+  if (url) {
+    img.src = url;
+    preview.style.display = 'block';
+  } else {
+    img.src = '';
+    preview.style.display = 'none';
+  }
+}
+
+editForm.addEventListener('submit', async e => {
+  e.preventDefault();
+  if (!editingAlbum) return;
+
+  const name  = editNameInput.value.trim();
+  const color = editColorInput.value;
+  if (!name) { editNameInput.focus(); return; }
+
+  const submitBtn = editForm.querySelector('[type="submit"]');
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Guardando…';
+
+  try {
+    const res = await fetch('api/albums.php', {
+      method:  'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ id: editingAlbum.id, name, color, cover_url: editCoverUrl }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error ?? 'Error al guardar');
+
+    const idx = albums.findIndex(a => a.id === editingAlbum.id);
+    if (idx !== -1) albums[idx] = { ...albums[idx], ...data };
+
+    closeEditModal();
+    renderAlbums();
+    showToast('Álbum actualizado');
+  } catch(err) {
+    showToast(err.message, 'error');
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Guardar cambios';
+  }
+});
 
 document.addEventListener('DOMContentLoaded', loadAlbums);

@@ -143,7 +143,7 @@ body {
 
 .album-card {
   position: relative;
-  padding: 28px 24px;
+  padding: 0;
   border-radius: var(--radius-lg);
   background: var(--surface);
   backdrop-filter: blur(24px) saturate(160%);
@@ -590,8 +590,7 @@ body {
   flex-shrink: 0;
 }
 
-/* ---- ALBUM CARD: extra bottom padding for action row ---- */
-.album-card { padding-bottom: 52px; }
+/* padding-bottom is now on .album-card-body */
 
 /* ---- ALBUM ACTIONS (bottom-right, visible on hover) ---- */
 .album-actions {
@@ -771,6 +770,131 @@ body {
   0%   { transform: translate(0,0) scale(1); }
   50%  { transform: translate(-16px,-12px) scale(1.03); }
   100% { transform: translate(22px,8px) scale(0.98); }
+}
+
+/* ---- LIGHTBOX TAG EDITING ---- */
+.lb-pill-label {
+  cursor: pointer;
+}
+
+.lb-pill-remove {
+  opacity: 0;
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.65);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  padding: 0 0 0 5px;
+  transition: opacity 0.15s, color 0.15s;
+}
+.lb-tag-pill:hover .lb-pill-remove { opacity: 1; }
+.lb-pill-remove:hover { color: #fff; }
+
+.lb-pill-input {
+  background: none;
+  border: none;
+  outline: none;
+  color: rgba(255,255,255,0.92);
+  font-size: 12px;
+  font-family: var(--font);
+  font-weight: 500;
+  width: 80px;
+  min-width: 40px;
+}
+
+.lb-tag-pill.editing {
+  border: 1px dashed rgba(0,113,227,0.55);
+}
+
+.lb-tag-add {
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.22);
+  border-radius: 100px;
+  color: rgba(255,255,255,0.65);
+  padding: 4px 11px;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  font-family: var(--font);
+}
+.lb-tag-add:hover {
+  background: rgba(255,255,255,0.2);
+  color: #fff;
+}
+
+/* ---- ALBUM CARD WITH COVER ---- */
+.album-card {
+  padding: 0;
+}
+
+.album-cover {
+  height: 140px;
+  background-size: cover;
+  background-position: center;
+  border-radius: 16px 16px 0 0;
+  flex-shrink: 0;
+}
+
+.album-card-body {
+  padding: 16px 20px 52px;
+  position: relative;
+}
+
+/* ---- ALBUM EDIT BUTTON ---- */
+.btn-album-edit {
+  background: rgba(255,255,255,0.85);
+  border: 1px solid rgba(0,0,0,0.1);
+  color: var(--text);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.btn-album-edit:hover { background: #fff; box-shadow: var(--shadow-sm); }
+
+/* ---- NATIVE COLOR PICKER ---- */
+.color-native {
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  display: block;
+  background: none;
+}
+.color-native::-webkit-color-swatch-wrapper { padding: 0; border-radius: 12px; }
+.color-native::-webkit-color-swatch        { border: none; border-radius: 12px; }
+.color-native::-moz-color-swatch           { border: none; border-radius: 12px; }
+
+/* ---- COVER IMAGE TABS ---- */
+.cover-tabs {
+  display: flex;
+  gap: 4px;
+  margin-top: 8px;
+  margin-bottom: 2px;
+}
+
+.cover-tab {
+  padding: 5px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(0,0,0,0.1);
+  background: rgba(255,255,255,0.6);
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--text-2);
+  transition: all 0.15s var(--ease);
+}
+.cover-tab.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+.cover-tab:not(.active):hover {
+  background: #fff;
+  color: var(--text);
 }
 
 /* ---- RESPONSIVE ---- */
