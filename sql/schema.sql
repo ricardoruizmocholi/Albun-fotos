@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS photos (
   album_id   INT UNSIGNED  NOT NULL,
   url        VARCHAR(500)  NOT NULL,
   title      VARCHAR(200)  NOT NULL DEFAULT '',
+  tags       VARCHAR(500)  NOT NULL DEFAULT '',
   pos_x      FLOAT         NOT NULL DEFAULT 0,
   pos_y      FLOAT         NOT NULL DEFAULT 0,
   pos_z      FLOAT         NOT NULL DEFAULT 0,
@@ -42,13 +43,13 @@ INSERT INTO albums (name, emoji, color) VALUES
   ('Viaje a la playa', '🏖️', '#0071e3');
 
 -- Fotos álbum 1 (id=1) — Unsplash
-INSERT INTO photos (album_id, url, title, pos_x, pos_y, pos_z, rot_x, rot_y, rot_z) VALUES
-  (1, 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800', 'El pastel',       -320,  60, -200,  2, -8,  1),
-  (1, 'https://images.unsplash.com/photo-1530103862676-de8c9debad1d?w=800', 'Los globos',    120, -80,  100, -3,  6, -2),
-  (1, 'https://images.unsplash.com/photo-1464349095431-e9a21285b5f3?w=800', 'Sorpresa',      -80, 140, -350,  4, 10,  3);
+INSERT INTO photos (album_id, url, title, tags, pos_x, pos_y, pos_z, rot_x, rot_y, rot_z) VALUES
+  (1, 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800', 'El pastel',  'pastel,cumple,2024', -320,  60, -200,  2, -8,  1),
+  (1, 'https://images.unsplash.com/photo-1530103862676-de8c9debad1d?w=800', 'Los globos', 'globos,fiesta',   120, -80,  100, -3,  6, -2),
+  (1, 'https://images.unsplash.com/photo-1464349095431-e9a21285b5f3?w=800', 'Sorpresa',   'sorpresa,cumple',  -80, 140, -350,  4, 10,  3);
 
 -- Fotos álbum 2 (id=2) — Unsplash
-INSERT INTO photos (album_id, url, title, pos_x, pos_y, pos_z, rot_x, rot_y, rot_z) VALUES
-  (2, 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800', 'Atardecer',    -280, -40, -150, -2, -7,  2),
-  (2, 'https://images.unsplash.com/photo-1476673160081-cf065607f449?w=800', 'Palmeras',      200,  90,  200,  3,  5, -1),
-  (2, 'https://images.unsplash.com/photo-1519046904884-53103b34b206?w=800', 'Olas',          -60, -120, -400,  1, -9,  4);
+INSERT INTO photos (album_id, url, title, tags, pos_x, pos_y, pos_z, rot_x, rot_y, rot_z) VALUES
+  (2, 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800', 'Atardecer', 'playa,atardecer,verano', -280, -40, -150, -2, -7,  2),
+  (2, 'https://images.unsplash.com/photo-1476673160081-cf065607f449?w=800', 'Palmeras',  'palmeras,tropical,playa',  200,  90,  200,  3,  5, -1),
+  (2, 'https://images.unsplash.com/photo-1519046904884-53103b34b206?w=800', 'Olas',      'olas,mar,verano',          -60, -120, -400,  1, -9,  4);
