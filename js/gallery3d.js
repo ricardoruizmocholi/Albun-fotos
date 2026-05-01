@@ -36,9 +36,7 @@ const scene = {
   rotX: 0, rotY: 0, tRotX: 0, tRotY: 0,
   zoom: 0, tZoom: 0,
   mouse: { down: false, lastX: 0, lastY: 0 },
-  LERP:     0.06,
-  ZOOM_MIN: -1800,
-  ZOOM_MAX:  3000,
+  LERP: 0.06,
 };
 
 function sceneInit() {
@@ -83,7 +81,7 @@ function bindMouseEvents() {
   window.addEventListener('mouseleave', () => { scene.mouse.down = false; });
   w.addEventListener('wheel', e => {
     e.preventDefault();
-    scene.tZoom = Math.min(scene.ZOOM_MAX, Math.max(scene.ZOOM_MIN, scene.tZoom + e.deltaY * -1.8));
+    scene.tZoom += e.deltaY * -1.8;
   }, { passive: false });
 }
 
@@ -111,7 +109,7 @@ function bindTouchEvents() {
         e.touches[0].clientX - e.touches[1].clientX,
         e.touches[0].clientY - e.touches[1].clientY
       );
-      scene.tZoom = Math.min(scene.ZOOM_MAX, Math.max(scene.ZOOM_MIN, scene.tZoom + (d - pinchDist) * 3));
+      scene.tZoom += (d - pinchDist) * 3;
       pinchDist = d;
     }
   }, { passive: false });
@@ -120,13 +118,59 @@ function bindTouchEvents() {
 // ---- Random 3D position (ephemeral, not persisted) ----
 function randomPos() {
   return {
-    pos_x: (Math.random() * 7600) - 3800,
-    pos_y: (Math.random() * 3200) - 1600,
-    pos_z: -800 - Math.random() * 8200,
-    rot_x: (Math.random() * 36)   - 18,
-    rot_y: (Math.random() * 36)   - 18,
-    rot_z: (Math.random() * 44)   - 22,
+    pos_x: (Math.random() * 3600) - 1800,
+    pos_y: (Math.random() * 1800) - 900,
+    pos_z: -400 - Math.random() * 4600,
+    rot_x: (Math.random() * 18)   - 9,
+    rot_y: (Math.random() * 18)   - 9,
+    rot_z: (Math.random() * 22)   - 11,
   };
+}
+
+// ---- Card drag ----
+const cardPos = new WeakMap();
+
+function buildCardTransform({ x, y, z, rx, ry, rz }) {
+  return `translate3d(${x}px,${y}px,${z}px) rotateX(${rx}deg) rotateY(${ry}deg) rotateZ(${rz}deg)`;
+}
+
+let isDraggingCard = false;
+let dragTarget     = null;
+let dragLastX      = 0;
+let dragLastY      = 0;
+let dragMoved      = false;
+
+function initCardDrag() {
+  document.addEventListener('mousemove', e => {
+    if (!isDraggingCard || !dragTarget) return;
+    const dx = e.clientX - dragLastX;
+    const dy = e.clientY - dragLastY;
+    dragLastX = e.clientX;
+    dragLastY = e.clientY;
+    if (dx !== 0 || dy !== 0) dragMoved = true;
+    const pos = cardPos.get(dragTarget);
+    if (!pos) return;
+    pos.x += dx;
+    pos.y += dy;
+    dragTarget.style.transform = buildCardTransform(pos);
+  });
+
+  document.addEventListener('mouseup', () => {
+    isDraggingCard             = false;
+    dragTarget                 = null;
+    document.body.style.cursor = '';
+  });
+
+  // Capture phase: fires before the scene wrapper's wheel handler
+  document.addEventListener('wheel', e => {
+    if (!isDraggingCard || !dragTarget) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const pos = cardPos.get(dragTarget);
+    if (!pos) return;
+    pos.z += e.deltaY < 0 ? 120 : -120;
+    dragTarget.style.transform = buildCardTransform(pos);
+  }, { passive: false, capture: true });
 }
 
 // ---- Photos ----
@@ -174,10 +218,10 @@ function renderPhotoCard(photo) {
   card.dataset.tags   = photo.tags  || '';
   card.dataset.title  = photo.title || '';
 
-  const pos = randomPos();
-  card.style.transform =
-    `translate3d(${pos.pos_x}px,${pos.pos_y}px,${pos.pos_z}px) ` +
-    `rotateX(${pos.rot_x}deg) rotateY(${pos.rot_y}deg) rotateZ(${pos.rot_z}deg)`;
+  const rp = randomPos();
+  const pos = { x: rp.pos_x, y: rp.pos_y, z: rp.pos_z, rx: rp.rot_x, ry: rp.rot_y, rz: rp.rot_z };
+  cardPos.set(card, pos);
+  card.style.transform = buildCardTransform(pos);
 
   card.innerHTML = `
     <img src="${escHtml(photo.url)}" alt="${escHtml(photo.title)}" loading="lazy" draggable="false">
@@ -192,8 +236,22 @@ function renderPhotoCard(photo) {
     e.stopPropagation();
     deletePhoto(photo.id);
   });
+
+  card.addEventListener('mousedown', e => {
+    if (e.button !== 0) return;
+    if (e.target.closest('.photo-delete-btn')) return;
+    isDraggingCard             = true;
+    dragTarget                 = card;
+    dragLastX                  = e.clientX;
+    dragLastY                  = e.clientY;
+    dragMoved                  = false;
+    document.body.style.cursor = 'grabbing';
+    e.stopPropagation(); // prevent scene pan
+  });
+
   card.addEventListener('click', e => {
     if (e.target.closest('.photo-delete-btn')) return;
+    if (dragMoved) return;
     openLightbox(photo);
   });
 
@@ -505,5 +563,6 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('uploadForm').dataset.albumId = albumId;
   initLightbox();
   initUploadModal();
+  initCardDrag();
   loadPhotos(albumId);
 });
