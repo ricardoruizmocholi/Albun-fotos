@@ -772,6 +772,81 @@ body {
   100% { transform: translate(22px,8px) scale(0.98); }
 }
 
+/* ---- ALBUM DRAG & DROP REORDER ---- */
+.album-card.dragging {
+  opacity: 0.45;
+  cursor: grabbing;
+}
+.album-card.drag-over {
+  outline: 2px dashed #0071e3;
+  outline-offset: -2px;
+  box-shadow: 0 0 0 4px rgba(0,113,227,0.10), var(--shadow-md);
+}
+
+/* ---- MULTI-FILE UPLOAD PREVIEW GRID ---- */
+.upload-preview-grid {
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.upload-preview-item {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #eee;
+  flex-shrink: 0;
+}
+
+.upload-preview-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.upload-preview-item-title {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(0,0,0,0.52);
+  border: none;
+  outline: none;
+  color: #fff;
+  font-size: 9px;
+  padding: 3px 5px;
+  font-family: var(--font);
+  width: 100%;
+}
+.upload-preview-item-title::placeholder { color: rgba(255,255,255,0.55); }
+
+.upload-preview-item-remove {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(255,59,48,0.88);
+  border: none;
+  color: #fff;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s;
+  padding: 0;
+}
+.upload-preview-item:hover .upload-preview-item-remove { opacity: 1; }
+
 /* ---- LIGHTBOX TAG EDITING ---- */
 .lb-pill-label {
   cursor: pointer;

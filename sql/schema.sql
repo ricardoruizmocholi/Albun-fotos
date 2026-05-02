@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS albums (
   emoji      VARCHAR(10)   NOT NULL DEFAULT '',
   color      VARCHAR(7)    NOT NULL DEFAULT '#0071e3',
   cover_url  VARCHAR(500)  NULL,
+  sort_order INT           NOT NULL DEFAULT 0,
   created_at TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 

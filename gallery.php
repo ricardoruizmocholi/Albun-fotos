@@ -141,18 +141,22 @@ $orbs = [
 <!-- ---- Upload modal ---- -->
 <div class="modal-overlay" id="uploadModal" role="dialog" aria-modal="true" aria-labelledby="uploadTitle">
   <div class="modal-box">
-    <h2 class="modal-title" id="uploadTitle">Añadir foto</h2>
+    <h2 class="modal-title" id="uploadTitle">Añadir fotos</h2>
     <form id="uploadForm" novalidate>
 
       <!-- Dropzone -->
       <div class="form-group">
-        <label>Archivo (JPG, PNG, WebP, GIF — max 10 MB)</label>
+        <label>Archivos (JPG, PNG, WebP, GIF — max 10 MB c/u)</label>
         <div class="dropzone" id="dropzone">
           <div class="drop-icon"></div>
           <p>Arrastra aquí o haz clic para seleccionar</p>
         </div>
-        <input type="file" id="photoFile" accept="image/jpeg,image/png,image/webp,image/gif" style="display:none">
+        <input type="file" id="photoFile" accept="image/jpeg,image/png,image/webp,image/gif" multiple style="display:none">
+        <div id="uploadFileWarning" style="display:none;font-size:12px;color:var(--danger);margin-top:6px"></div>
       </div>
+
+      <!-- Preview grid (modo multi-archivo) -->
+      <div id="uploadPreviewGrid" class="upload-preview-grid" style="display:none"></div>
 
       <!-- Divisor -->
       <div style="display:flex;align-items:center;gap:10px;margin:4px 0 16px">
@@ -161,30 +165,37 @@ $orbs = [
         <div style="flex:1;height:1px;background:rgba(0,0,0,0.08)"></div>
       </div>
 
-      <!-- URL externa -->
-      <div class="form-group">
+      <!-- URL externa (modo URL) -->
+      <div class="form-group" id="uploadUrlGroup">
         <label for="photoUrl">URL de imagen externa</label>
         <input id="photoUrl" class="form-input" type="url" placeholder="https://…">
       </div>
 
-      <!-- Preview -->
+      <!-- Preview URL -->
       <div id="uploadPreview" style="margin-bottom:12px;display:none"></div>
 
-      <!-- Título -->
-      <div class="form-group">
+      <!-- Título (modo URL) -->
+      <div class="form-group" id="uploadTitleGroup">
         <label for="photoTitle">Título (opcional)</label>
         <input id="photoTitle" class="form-input" type="text" placeholder="Ej: Momento especial" maxlength="200">
       </div>
 
-      <!-- Etiquetas -->
+      <!-- Etiquetas (siempre visible) -->
       <div class="form-group">
-        <label for="photoTags">Etiquetas (opcional)</label>
+        <label for="photoTags">Etiquetas (opcional, para todas)</label>
         <input id="photoTags" class="form-input" type="text" placeholder="playa, verano, familia" maxlength="500">
+      </div>
+
+      <!-- Barra de progreso -->
+      <div id="uploadProgressWrap" style="display:none;margin-bottom:12px">
+        <div style="height:4px;background:rgba(0,0,0,0.08);border-radius:2px;overflow:hidden">
+          <div id="uploadProgressBar" style="height:100%;width:0%;background:#0071e3;border-radius:2px;transition:width 0.25s ease"></div>
+        </div>
       </div>
 
       <div class="modal-footer">
         <button type="button" class="btn btn-ghost" id="cancelUpload">Cancelar</button>
-        <button type="submit" class="btn btn-primary">Subir foto</button>
+        <button type="submit" class="btn btn-primary" id="uploadSubmitBtn">Subir foto</button>
       </div>
     </form>
   </div>

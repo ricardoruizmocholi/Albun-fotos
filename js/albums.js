@@ -32,6 +32,7 @@ let selectedColor = '#0071e3';
 let albums = [];
 let editingAlbum = null;
 let editCoverUrl = '';
+let dragSrcAlbumId = null;
 
 // ---- DOM refs ----
 const grid      = document.getElementById('albumsGrid');
@@ -98,8 +99,62 @@ function renderAlbums() {
       deleteAlbum(album.id, album.name);
     });
 
+    // ---- Drag & drop reorder ----
+    a.draggable = true;
+
+    a.addEventListener('dragstart', e => {
+      dragSrcAlbumId = album.id;
+      a.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', String(album.id));
+    });
+
+    a.addEventListener('dragend', () => {
+      a.classList.remove('dragging');
+      document.querySelectorAll('.album-card').forEach(c => c.classList.remove('drag-over'));
+      dragSrcAlbumId = null;
+    });
+
+    a.addEventListener('dragover', e => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      if (dragSrcAlbumId === album.id) return;
+      document.querySelectorAll('.album-card').forEach(c => c.classList.remove('drag-over'));
+      a.classList.add('drag-over');
+    });
+
+    a.addEventListener('dragleave', e => {
+      if (!a.contains(e.relatedTarget)) a.classList.remove('drag-over');
+    });
+
+    a.addEventListener('drop', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      a.classList.remove('drag-over');
+      if (dragSrcAlbumId === null || dragSrcAlbumId === album.id) return;
+      const srcIdx = albums.findIndex(al => al.id === dragSrcAlbumId);
+      const dstIdx = albums.findIndex(al => al.id === album.id);
+      if (srcIdx === -1 || dstIdx === -1) return;
+      const [moved] = albums.splice(srcIdx, 1);
+      albums.splice(dstIdx, 0, moved);
+      renderAlbums();
+      saveAlbumOrder();
+    });
+
     grid.insertBefore(a, newBtn);
   });
+}
+
+// ---- Save album order ----
+async function saveAlbumOrder() {
+  try {
+    const res = await fetch('api/albums.php?action=reorder', {
+      method:  'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ order: albums.map(a => a.id) }),
+    });
+    if (!res.ok) throw new Error('Error al guardar orden');
+  } catch(e) { showToast(e.message, 'error'); }
 }
 
 // ---- Load albums ----

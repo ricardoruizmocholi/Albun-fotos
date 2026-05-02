@@ -27,7 +27,7 @@ try {
              FROM albums a
              LEFT JOIN photos p ON p.album_id = a.id
              GROUP BY a.id
-             ORDER BY a.created_at DESC'
+             ORDER BY a.sort_order ASC, a.created_at DESC'
         );
         jsonOut($stmt->fetchAll());
     }
@@ -70,6 +70,18 @@ try {
         $album = $pdo->prepare('SELECT *, 0 AS photo_count FROM albums WHERE id = ?');
         $album->execute([$id]);
         jsonOut($album->fetch(), 201);
+    }
+
+    // ---- PATCH: reordenar álbumes ----
+    if ($method === 'PATCH' && ($_GET['action'] ?? '') === 'reorder') {
+        $body  = json_decode(file_get_contents('php://input'), true) ?? [];
+        $order = array_values(array_filter(array_map('intval', $body['order'] ?? []), fn($v) => $v > 0));
+        if (empty($order)) jsonOut(['error' => 'Order vacío'], 422);
+        $stmt = $pdo->prepare('UPDATE albums SET sort_order = ? WHERE id = ?');
+        foreach ($order as $i => $id) {
+            $stmt->execute([$i, $id]);
+        }
+        jsonOut(['ok' => true]);
     }
 
     // ---- PATCH: editar álbum ----

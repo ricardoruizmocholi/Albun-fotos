@@ -463,93 +463,230 @@ async function saveTagsToServer() {
 
 // ---- Upload modal ----
 function initUploadModal() {
-  const modal     = document.getElementById('uploadModal');
-  const form      = document.getElementById('uploadForm');
-  const dropzone  = document.getElementById('dropzone');
-  const fileInput = document.getElementById('photoFile');
-  const urlInput  = document.getElementById('photoUrl');
-  const preview   = document.getElementById('uploadPreview');
+  const modal        = document.getElementById('uploadModal');
+  const form         = document.getElementById('uploadForm');
+  const dropzone     = document.getElementById('dropzone');
+  const fileInput    = document.getElementById('photoFile');
+  const urlInput     = document.getElementById('photoUrl');
+  const urlGroup     = document.getElementById('uploadUrlGroup');
+  const titleGroup   = document.getElementById('uploadTitleGroup');
+  const singlePreview = document.getElementById('uploadPreview');
+  const previewGrid  = document.getElementById('uploadPreviewGrid');
+  const fileWarning  = document.getElementById('uploadFileWarning');
+  const progressWrap = document.getElementById('uploadProgressWrap');
+  const progressBar  = document.getElementById('uploadProgressBar');
+  const submitBtn    = document.getElementById('uploadSubmitBtn');
 
   const dropIcon = dropzone.querySelector('.drop-icon');
   if (dropIcon) dropIcon.innerHTML = SVG.folder;
 
-  document.getElementById('uploadBtn').addEventListener('click', () => {
-    modal.classList.add('open');
+  let selectedFiles = []; // [{file, title}]
+  let objectUrls    = [];
+
+  function resetModal() {
     form.reset();
-    preview.innerHTML = '';
-    preview.style.display = 'none';
+    selectedFiles = [];
+    objectUrls.forEach(u => URL.revokeObjectURL(u));
+    objectUrls = [];
+    previewGrid.innerHTML    = '';
+    previewGrid.style.display = 'none';
+    fileWarning.textContent  = '';
+    fileWarning.style.display = 'none';
+    singlePreview.innerHTML  = '';
+    singlePreview.style.display = 'none';
+    progressWrap.style.display  = 'none';
+    progressBar.style.width     = '0%';
+    titleGroup.style.display    = '';
+    urlGroup.style.display      = '';
+    submitBtn.textContent        = 'Subir foto';
+    submitBtn.disabled           = false;
     const p = dropzone.querySelector('p');
     if (p) p.textContent = 'Arrastra aquí o haz clic para seleccionar';
+  }
+
+  function setFiles(fileList) {
+    let files = Array.from(fileList).filter(f => f.type.startsWith('image/'));
+    if (files.length > 50) {
+      fileWarning.textContent   = 'Máximo 50 fotos por subida. Se han recortado los excedentes.';
+      fileWarning.style.display = 'block';
+      files = files.slice(0, 50);
+    } else {
+      fileWarning.style.display = 'none';
+    }
+    selectedFiles = files.map(f => ({ file: f, title: '' }));
+    renderPreviewGrid();
+    updateSubmitLabel();
+    const multiMode = selectedFiles.length > 0;
+    titleGroup.style.display = multiMode ? 'none' : '';
+    urlGroup.style.display   = multiMode ? 'none' : '';
+  }
+
+  function renderPreviewGrid() {
+    objectUrls.forEach(u => URL.revokeObjectURL(u));
+    objectUrls = [];
+    previewGrid.innerHTML = '';
+
+    if (selectedFiles.length === 0) {
+      previewGrid.style.display = 'none';
+      return;
+    }
+    previewGrid.style.display = 'grid';
+
+    selectedFiles.forEach(({ file, title }, i) => {
+      const objUrl = URL.createObjectURL(file);
+      objectUrls.push(objUrl);
+
+      const item = document.createElement('div');
+      item.className = 'upload-preview-item';
+
+      const img = document.createElement('img');
+      img.src = objUrl;
+      img.alt = file.name;
+
+      const titleInput = document.createElement('input');
+      titleInput.type        = 'text';
+      titleInput.className   = 'upload-preview-item-title';
+      titleInput.placeholder = 'Título';
+      titleInput.maxLength   = 200;
+      titleInput.value       = title;
+      titleInput.addEventListener('input', ev => { selectedFiles[i].title = ev.target.value; });
+
+      const removeBtn = document.createElement('button');
+      removeBtn.type      = 'button';
+      removeBtn.className = 'upload-preview-item-remove';
+      removeBtn.innerHTML = '&times;';
+      removeBtn.title     = 'Quitar';
+      removeBtn.addEventListener('click', () => {
+        selectedFiles.splice(i, 1);
+        renderPreviewGrid();
+        updateSubmitLabel();
+        if (selectedFiles.length === 0) {
+          titleGroup.style.display = '';
+          urlGroup.style.display   = '';
+        }
+      });
+
+      item.appendChild(img);
+      item.appendChild(titleInput);
+      item.appendChild(removeBtn);
+      previewGrid.appendChild(item);
+    });
+  }
+
+  function updateSubmitLabel() {
+    const n = selectedFiles.length;
+    submitBtn.textContent = n > 0 ? `Subir ${n} foto${n !== 1 ? 's' : ''}` : 'Subir foto';
+  }
+
+  // ---- Open / close ----
+  document.getElementById('uploadBtn').addEventListener('click', () => {
+    resetModal();
+    modal.classList.add('open');
   });
+  const closeModal = () => { resetModal(); modal.classList.remove('open'); };
+  modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
+  document.getElementById('cancelUpload').addEventListener('click', closeModal);
 
-  modal.addEventListener('click', e => { if (e.target === modal) modal.classList.remove('open'); });
-  document.getElementById('cancelUpload').addEventListener('click', () => modal.classList.remove('open'));
-
+  // ---- Dropzone ----
   dropzone.addEventListener('click',    () => fileInput.click());
   dropzone.addEventListener('dragover',  e => { e.preventDefault(); dropzone.classList.add('drag-over'); });
   dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag-over'));
   dropzone.addEventListener('drop', e => {
     e.preventDefault(); dropzone.classList.remove('drag-over');
-    if (e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]);
+    if (e.dataTransfer.files.length) setFiles(e.dataTransfer.files);
   });
-  fileInput.addEventListener('change', () => { if (fileInput.files[0]) setFile(fileInput.files[0]); });
+  fileInput.addEventListener('change', () => { if (fileInput.files.length) setFiles(fileInput.files); });
 
+  // ---- URL preview ----
   urlInput.addEventListener('input', () => {
     const url = urlInput.value.trim();
     if (url) {
-      preview.style.display = 'block';
-      preview.innerHTML = `<img src="${escHtml(url)}" style="max-width:100%;border-radius:10px;max-height:160px;object-fit:cover;" onerror="this.style.display='none'">`;
-    } else { preview.innerHTML = ''; preview.style.display = 'none'; }
+      singlePreview.style.display = 'block';
+      singlePreview.innerHTML = `<img src="${escHtml(url)}" style="max-width:100%;border-radius:10px;max-height:160px;object-fit:cover;" onerror="this.style.display='none'">`;
+    } else { singlePreview.innerHTML = ''; singlePreview.style.display = 'none'; }
   });
 
-  function setFile(file) {
-    const dt = new DataTransfer(); dt.items.add(file); fileInput.files = dt.files;
-    const reader = new FileReader();
-    reader.onload = ev => {
-      preview.style.display = 'block';
-      preview.innerHTML = `<img src="${ev.target.result}" style="max-width:100%;border-radius:10px;max-height:160px;object-fit:cover;">`;
-    };
-    reader.readAsDataURL(file);
-    const p = dropzone.querySelector('p');
-    if (p) p.textContent = file.name;
-  }
-
+  // ---- Submit ----
   form.addEventListener('submit', async e => {
     e.preventDefault();
     const albumId = form.dataset.albumId;
-    const title   = document.getElementById('photoTitle').value.trim();
     const rawTags = document.getElementById('photoTags').value.trim();
     const tags    = [...new Set(rawTags.toLowerCase().split(',').map(t => t.trim()).filter(Boolean))].join(',');
-    const submit  = form.querySelector('[type="submit"]');
-    submit.disabled = true; submit.textContent = 'Subiendo…';
 
-    try {
-      const fd = new FormData();
-      fd.append('album_id', albumId);
-      fd.append('title', title);
-      fd.append('tags', tags);
+    submitBtn.disabled = true;
 
-      if (fileInput.files[0]) {
-        fd.append('photo', fileInput.files[0]);
-      } else if (urlInput.value.trim()) {
-        fd.append('url', urlInput.value.trim());
+    if (selectedFiles.length > 0) {
+      // Multi-file upload
+      const total = selectedFiles.length;
+      let completed = 0;
+      progressWrap.style.display = 'block';
+      progressBar.style.width    = '0%';
+
+      const tick = () => {
+        completed++;
+        progressBar.style.width = `${Math.round((completed / total) * 100)}%`;
+      };
+
+      const results = await Promise.allSettled(
+        selectedFiles.map(async ({ file, title }) => {
+          try {
+            const fd = new FormData();
+            fd.append('album_id', albumId);
+            fd.append('title',    title.trim());
+            fd.append('tags',     tags);
+            fd.append('photo',    file);
+            const res  = await fetch('api/photos.php', { method: 'POST', body: fd });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error ?? 'Error');
+            return data;
+          } finally { tick(); }
+        })
+      );
+
+      const ok  = results.filter(r => r.status === 'fulfilled');
+      const bad = results.filter(r => r.status === 'rejected').length;
+
+      ok.forEach(r => { photos.push(r.value); renderPhotoCard(r.value); });
+      updatePhotoCount();
+      closeModal();
+
+      if (bad === 0) {
+        showToast(`${ok.length} foto${ok.length !== 1 ? 's' : ''} subida${ok.length !== 1 ? 's' : ''} correctamente`);
+      } else if (ok.length === 0) {
+        showToast(`${bad} foto${bad !== 1 ? 's' : ''} fallida${bad !== 1 ? 's' : ''}`, 'error');
       } else {
-        throw new Error('Selecciona un archivo o escribe una URL');
+        showToast(`${ok.length} correcta${ok.length !== 1 ? 's' : ''}, ${bad} fallida${bad !== 1 ? 's' : ''}`, 'error');
       }
 
-      const res  = await fetch('api/photos.php', { method: 'POST', body: fd });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? 'Error al subir');
-
-      modal.classList.remove('open');
-      showToast('Foto agregada');
-      photos.push(data);
-      renderPhotoCard(data);
-      updatePhotoCount();
-    } catch(e) {
-      showToast(e.message, 'error');
-    } finally {
-      submit.disabled = false; submit.textContent = 'Subir foto';
+    } else {
+      // Modo URL — subida individual
+      const title = document.getElementById('photoTitle').value.trim();
+      const url   = urlInput.value.trim();
+      if (!url) {
+        showToast('Selecciona archivos o escribe una URL', 'error');
+        submitBtn.disabled = false;
+        return;
+      }
+      submitBtn.textContent = 'Subiendo…';
+      try {
+        const fd = new FormData();
+        fd.append('album_id', albumId);
+        fd.append('title',    title);
+        fd.append('tags',     tags);
+        fd.append('url',      url);
+        const res  = await fetch('api/photos.php', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? 'Error al subir');
+        closeModal();
+        showToast('Foto agregada');
+        photos.push(data);
+        renderPhotoCard(data);
+        updatePhotoCount();
+      } catch(err) {
+        showToast(err.message, 'error');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Subir foto';
+      }
     }
   });
 }
