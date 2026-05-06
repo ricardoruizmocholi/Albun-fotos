@@ -46,17 +46,25 @@ function sceneInit() {
   requestAnimationFrame(animLoop);
 }
 
+function applyWorldTransform() {
+  const clampedZ = camPos.z < -6000 ? -6000 : camPos.z;
+  const scale    = camPos.z < -6000 ? Math.max(0.08, 1 + (camPos.z + 6000) / 6000) : 1;
+  scene.el.style.transform = scale < 1
+    ? `translate3d(${camPos.x}px,${camPos.y}px,${clampedZ}px) scale(${scale})`
+    : `translate3d(${camPos.x}px,${camPos.y}px,${camPos.z}px)`;
+}
+
 function animLoop() {
   if (cameraDirty && scene.el) {
     camPos.x += (scene.tPanX - camPos.x) * scene.LERP;
     camPos.y += (scene.tPanY - camPos.y) * scene.LERP;
     camPos.z += (scene.tZoom  - camPos.z) * scene.LERP;
-    scene.el.style.transform = `translate3d(${camPos.x}px,${camPos.y}px,${camPos.z}px)`;
+    applyWorldTransform();
     if (Math.abs(scene.tPanX - camPos.x) < 0.05 &&
         Math.abs(scene.tPanY - camPos.y) < 0.05 &&
         Math.abs(scene.tZoom  - camPos.z) < 0.05) {
       camPos.x = scene.tPanX; camPos.y = scene.tPanY; camPos.z = scene.tZoom;
-      scene.el.style.transform = `translate3d(${camPos.x}px,${camPos.y}px,${camPos.z}px)`;
+      applyWorldTransform();
       cameraDirty = false;
     }
   }
@@ -160,8 +168,11 @@ function initCardDrag() {
     if (dx !== 0 || dy !== 0) dragMoved = true;
     const pos = cardPos.get(dragTarget);
     if (!pos) return;
-    pos.x += dx;
-    pos.y += dy;
+    const perspective = 1200;
+    const cardWorldZ  = pos.z + camPos.z;
+    const factor      = (perspective - cardWorldZ) / perspective;
+    pos.x += dx * factor;
+    pos.y += dy * factor;
     dragTarget.style.transform = buildCardTransform(pos);
   });
 
