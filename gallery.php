@@ -30,9 +30,16 @@ $albumColor = preg_match('/^#[0-9a-fA-F]{6}$/', $album['color']) ? $album['color
   <style>
     /* Acento del álbum */
     :root { --accent: <?= $albumColor ?>; --accent-h: <?= $albumColor ?>cc; }
+    /* Fondo base: el canvas animado lo cubre visualmente */
+    body { background: #e8eaf6; }
+    /* Elimina círculos difusos CSS del fondo anterior si existen */
+    .bg-circles, .bg-blob, .bg-orb, .anim-circle { display: none !important; }
   </style>
 </head>
 <body>
+
+<!-- ---- Canvas fondo animado (z-index:0, detrás de todo) ---- -->
+<canvas id="bg-dots" style="position:fixed;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;"></canvas>
 
 <!-- ---- Site header ---- -->
 <header class="site-header">
@@ -130,5 +137,9 @@ $albumColor = preg_match('/^#[0-9a-fA-F]{6}$/', $album['color']) ? $album['color
 <div class="toast-container" id="toastContainer"></div>
 
 <script src="js/gallery3d.js"></script>
+<script type="module">
+  import { init } from "./canvas-bg-dots.js";
+  init(document.getElementById("bg-dots"));
+</script>
 </body>
 </html>
