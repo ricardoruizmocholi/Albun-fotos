@@ -31,11 +31,11 @@ function escHtml(s) {
 // ---- 3D Engine ----
 const scene = {
   el:   null,
-  tPanX: 0, tPanY: 0, tZoom: 0,
+  tPanX: 0, tPanY: 0, tScale: 1,
   mouse: { down: false, lastX: 0, lastY: 0 },
   LERP: 0.06,
 };
-const camPos = { x: 0, y: 0, z: 0 };
+const camPos = { x: 0, y: 0, scale: 1 };
 let cameraDirty = false;
 
 function sceneInit() {
@@ -47,23 +47,19 @@ function sceneInit() {
 }
 
 function applyWorldTransform() {
-  const clampedZ = camPos.z < -6000 ? -6000 : camPos.z;
-  const scale    = camPos.z < -6000 ? Math.max(0.08, 1 + (camPos.z + 6000) / 6000) : 1;
-  scene.el.style.transform = scale < 1
-    ? `translate3d(${camPos.x}px,${camPos.y}px,${clampedZ}px) scale(${scale})`
-    : `translate3d(${camPos.x}px,${camPos.y}px,${camPos.z}px)`;
+  scene.el.style.transform = `translate3d(${camPos.x}px,${camPos.y}px,0px) scale(${camPos.scale})`;
 }
 
 function animLoop() {
   if (cameraDirty && scene.el) {
-    camPos.x += (scene.tPanX - camPos.x) * scene.LERP;
-    camPos.y += (scene.tPanY - camPos.y) * scene.LERP;
-    camPos.z += (scene.tZoom  - camPos.z) * scene.LERP;
+    camPos.x     += (scene.tPanX  - camPos.x)     * scene.LERP;
+    camPos.y     += (scene.tPanY  - camPos.y)     * scene.LERP;
+    camPos.scale += (scene.tScale - camPos.scale) * scene.LERP;
     applyWorldTransform();
-    if (Math.abs(scene.tPanX - camPos.x) < 0.05 &&
-        Math.abs(scene.tPanY - camPos.y) < 0.05 &&
-        Math.abs(scene.tZoom  - camPos.z) < 0.05) {
-      camPos.x = scene.tPanX; camPos.y = scene.tPanY; camPos.z = scene.tZoom;
+    if (Math.abs(scene.tPanX  - camPos.x)     < 0.05 &&
+        Math.abs(scene.tPanY  - camPos.y)     < 0.05 &&
+        Math.abs(scene.tScale - camPos.scale) < 0.0001) {
+      camPos.x = scene.tPanX; camPos.y = scene.tPanY; camPos.scale = scene.tScale;
       applyWorldTransform();
       cameraDirty = false;
     }
@@ -96,7 +92,7 @@ function bindMouseEvents() {
   document.addEventListener('wheel', e => {
     if (e.target.closest('.modal-overlay') || e.target.closest('.lightbox-overlay')) return;
     e.preventDefault();
-    scene.tZoom += e.deltaY * -1.8;
+    scene.tScale = Math.max(0.05, scene.tScale + e.deltaY * -0.001);
     cameraDirty = true;
   }, { passive: false });
 }
@@ -126,7 +122,7 @@ function bindTouchEvents() {
         e.touches[0].clientX - e.touches[1].clientX,
         e.touches[0].clientY - e.touches[1].clientY
       );
-      scene.tZoom += (d - pinchDist) * 3;
+      scene.tScale = Math.max(0.05, scene.tScale + (d - pinchDist) * 0.003);
       pinchDist = d;
     }
     cameraDirty = true;
@@ -168,11 +164,8 @@ function initCardDrag() {
     if (dx !== 0 || dy !== 0) dragMoved = true;
     const pos = cardPos.get(dragTarget);
     if (!pos) return;
-    const perspective = 1200;
-    const cardWorldZ  = pos.z + camPos.z;
-    const factor      = (perspective - cardWorldZ) / perspective;
-    pos.x += dx * factor;
-    pos.y += dy * factor;
+    pos.x += dx / camPos.scale;
+    pos.y += dy / camPos.scale;
     dragTarget.style.transform = buildCardTransform(pos);
   });
 
