@@ -17,33 +17,6 @@ if (!$album) { header('Location: index.php'); exit; }
 $albumName  = htmlspecialchars($album['name'], ENT_QUOTES, 'UTF-8');
 $albumColor = preg_match('/^#[0-9a-fA-F]{6}$/', $album['color']) ? $album['color'] : '#0071e3';
 
-// 24 orbs for animated background
-$orbs = [
-  ['w'=>140,'h'=>140,'t'=>  7,'l'=> 4,'c'=>'rgb(173,216,230)','a'=>'floatA','d'=>'14s','dl'=>'0s'],
-  ['w'=> 80,'h'=> 80,'t'=> 18,'l'=>88,'c'=>'rgb(255,182,193)','a'=>'floatB','d'=>'11s','dl'=>'-3s'],
-  ['w'=>180,'h'=>180,'t'=> 55,'l'=>45,'c'=>'rgb(144,238,144)','a'=>'floatC','d'=>'17s','dl'=>'-7s'],
-  ['w'=> 60,'h'=> 60,'t'=> 72,'l'=>12,'c'=>'rgb(255,218,185)','a'=>'floatD','d'=> '9s','dl'=>'-2s'],
-  ['w'=>100,'h'=>100,'t'=> 30,'l'=>70,'c'=>'rgb(221,160,221)','a'=>'floatA','d'=>'13s','dl'=>'-5s'],
-  ['w'=> 50,'h'=> 50,'t'=> 85,'l'=>60,'c'=>'rgb(176,224,230)','a'=>'floatB','d'=> '8s','dl'=>'-1s'],
-  ['w'=>120,'h'=>120,'t'=> 10,'l'=>55,'c'=>'rgb(255,239,213)','a'=>'floatC','d'=>'16s','dl'=>'-9s'],
-  ['w'=> 70,'h'=> 70,'t'=> 45,'l'=>25,'c'=>'rgb(230,230,250)','a'=>'floatD','d'=>'12s','dl'=>'-4s'],
-  ['w'=>160,'h'=>160,'t'=> 65,'l'=>80,'c'=>'rgb(255,228,225)','a'=>'floatA','d'=>'18s','dl'=>'-6s'],
-  ['w'=> 45,'h'=> 45,'t'=> 20,'l'=>35,'c'=>'rgb(204,255,204)','a'=>'floatB','d'=>'10s','dl'=>'-8s'],
-  ['w'=> 90,'h'=> 90,'t'=> 78,'l'=> 3,'c'=>'rgb(255,204,229)','a'=>'floatC','d'=>'15s','dl'=>'-2s'],
-  ['w'=>110,'h'=>110,'t'=>  3,'l'=>78,'c'=>'rgb(204,229,255)','a'=>'floatD','d'=>'11s','dl'=>'-7s'],
-  ['w'=> 55,'h'=> 55,'t'=> 50,'l'=>50,'c'=>'rgb(255,255,204)','a'=>'floatA','d'=> '9s','dl'=>'-3s'],
-  ['w'=>130,'h'=>130,'t'=> 88,'l'=>40,'c'=>'rgb(204,255,255)','a'=>'floatB','d'=>'16s','dl'=>'-5s'],
-  ['w'=> 75,'h'=> 75,'t'=> 38,'l'=>92,'c'=>'rgb(255,220,200)','a'=>'floatC','d'=>'13s','dl'=>'-1s'],
-  ['w'=> 95,'h'=> 95,'t'=> 15,'l'=>18,'c'=>'rgb(220,200,255)','a'=>'floatD','d'=>'10s','dl'=>'-6s'],
-  ['w'=> 40,'h'=> 40,'t'=> 60,'l'=>68,'c'=>'rgb(200,240,220)','a'=>'floatA','d'=> '8s','dl'=>'-4s'],
-  ['w'=>150,'h'=>150,'t'=> 25,'l'=>62,'c'=>'rgb(255,210,210)','a'=>'floatB','d'=>'17s','dl'=>'-9s'],
-  ['w'=> 65,'h'=> 65,'t'=> 92,'l'=>22,'c'=>'rgb(210,230,255)','a'=>'floatC','d'=>'12s','dl'=>'-2s'],
-  ['w'=> 85,'h'=> 85,'t'=> 42,'l'=> 8,'c'=>'rgb(255,240,200)','a'=>'floatD','d'=>'14s','dl'=>'-7s'],
-  ['w'=>115,'h'=>115,'t'=> 70,'l'=>55,'c'=>'rgb(200,255,230)','a'=>'floatA','d'=>'11s','dl'=>'-5s'],
-  ['w'=> 48,'h'=> 48,'t'=>  5,'l'=>42,'c'=>'rgb(255,200,240)','a'=>'floatB','d'=> '9s','dl'=>'-3s'],
-  ['w'=>170,'h'=>170,'t'=> 48,'l'=>30,'c'=>'rgb(230,210,255)','a'=>'floatC','d'=>'18s','dl'=>'-8s'],
-  ['w'=> 58,'h'=> 58,'t'=> 82,'l'=>82,'c'=>'rgb(200,220,255)','a'=>'floatD','d'=>'13s','dl'=>'-1s'],
-];
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -54,23 +27,12 @@ $orbs = [
   <link rel="stylesheet" href="css/style.css">
   <style>
     :root { --accent: <?= $albumColor ?>; --accent-h: <?= $albumColor ?>cc; }
-    body  { background: transparent; }
+    body  { background: transparent; cursor: grab; }
   </style>
 </head>
 <body>
 
-<!-- ---- Animated background (gallery only) ---- -->
-<div class="gallery-bg" aria-hidden="true">
-  <?php foreach ($orbs as $o): ?>
-  <div class="orb" style="
-    width:<?= $o['w'] ?>px;height:<?= $o['h'] ?>px;
-    top:<?= $o['t'] ?>%;left:<?= $o['l'] ?>%;
-    background:<?= $o['c'] ?>;
-    animation:<?= $o['a'] ?> <?= $o['d'] ?> <?= $o['dl'] ?> ease-in-out infinite alternate;
-  "></div>
-  <?php endforeach; ?>
-</div>
-
+<canvas id="bg-dots" style="position:fixed;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;"></canvas>
 <!-- ---- Site header ---- -->
 <header class="site-header">
   <a href="index.php" class="logo">
@@ -108,10 +70,9 @@ $orbs = [
 </div>
 
 <!-- ---- 3D Scene ---- -->
-<div class="scene-wrapper" id="sceneWrapper">
-  <div class="scene-perspective">
-    <div class="scene-3d" id="scene3d"></div>
-  </div>
+<div id="gallery-status" class="empty-state" style="position:fixed;inset:104px 0 56px;z-index:2;pointer-events:none;"></div>
+<div id="scene">
+  <div id="world"></div>
 </div>
 
 <!-- ---- Controls hint ---- -->
@@ -205,5 +166,10 @@ $orbs = [
 <div class="toast-container" id="toastContainer"></div>
 
 <script src="js/gallery3d.js"></script>
+<script type="module">
+  import { init } from "./canvas-bg-dots.js";
+  init(document.getElementById("bg-dots"));
+</script>
+
 </body>
 </html>

@@ -30,45 +30,47 @@ function escHtml(s) {
 
 // ---- 3D Engine ----
 const scene = {
-  el:      null,
-  wrapper: null,
-  panX: 0, panY: 0, tPanX: 0, tPanY: 0,
-  rotX: 0, rotY: 0, tRotX: 0, tRotY: 0,
-  zoom: 0, tZoom: 0,
+  el:   null,
+  tPanX: 0, tPanY: 0, tZoom: 0,
   mouse: { down: false, lastX: 0, lastY: 0 },
   LERP: 0.06,
 };
+const camPos = { x: 0, y: 0, z: 0 };
+let cameraDirty = false;
 
 function sceneInit() {
-  scene.el      = document.getElementById('scene3d');
-  scene.wrapper = document.getElementById('sceneWrapper');
-  if (!scene.el || !scene.wrapper) return;
+  scene.el = document.getElementById('world');
+  if (!scene.el) return;
   bindMouseEvents();
   bindTouchEvents();
   requestAnimationFrame(animLoop);
 }
 
 function animLoop() {
-  const s = scene;
-  s.panX += (s.tPanX - s.panX) * s.LERP;
-  s.panY += (s.tPanY - s.panY) * s.LERP;
-  s.rotX += (s.tRotX - s.rotX) * s.LERP;
-  s.rotY += (s.tRotY - s.rotY) * s.LERP;
-  s.zoom += (s.tZoom - s.zoom) * s.LERP;
-  if (s.el) {
-    s.el.style.transform =
-      `translate3d(${s.panX}px,${s.panY}px,${s.zoom}px) rotateX(${s.rotX}deg) rotateY(${s.rotY}deg)`;
+  if (cameraDirty && scene.el) {
+    camPos.x += (scene.tPanX - camPos.x) * scene.LERP;
+    camPos.y += (scene.tPanY - camPos.y) * scene.LERP;
+    camPos.z += (scene.tZoom  - camPos.z) * scene.LERP;
+    scene.el.style.transform = `translate3d(${camPos.x}px,${camPos.y}px,${camPos.z}px)`;
+    if (Math.abs(scene.tPanX - camPos.x) < 0.05 &&
+        Math.abs(scene.tPanY - camPos.y) < 0.05 &&
+        Math.abs(scene.tZoom  - camPos.z) < 0.05) {
+      camPos.x = scene.tPanX; camPos.y = scene.tPanY; camPos.z = scene.tZoom;
+      scene.el.style.transform = `translate3d(${camPos.x}px,${camPos.y}px,${camPos.z}px)`;
+      cameraDirty = false;
+    }
   }
   requestAnimationFrame(animLoop);
 }
 
 function bindMouseEvents() {
-  const w = scene.wrapper;
-  w.addEventListener('mousedown', e => {
+  document.addEventListener('mousedown', e => {
     if (e.button !== 0) return;
+    if (e.target.closest('.photo-card') || e.target.closest('.modal-overlay') || e.target.closest('.lightbox-overlay')) return;
     scene.mouse.down  = true;
     scene.mouse.lastX = e.clientX;
     scene.mouse.lastY = e.clientY;
+    document.body.style.cursor = 'grabbing';
   });
   window.addEventListener('mousemove', e => {
     if (!scene.mouse.down) return;
@@ -76,19 +78,25 @@ function bindMouseEvents() {
     scene.tPanY += e.clientY - scene.mouse.lastY;
     scene.mouse.lastX = e.clientX;
     scene.mouse.lastY = e.clientY;
+    cameraDirty = true;
   });
-  window.addEventListener('mouseup',    () => { scene.mouse.down = false; });
-  window.addEventListener('mouseleave', () => { scene.mouse.down = false; });
-  w.addEventListener('wheel', e => {
+  window.addEventListener('mouseup', () => {
+    if (scene.mouse.down) document.body.style.cursor = '';
+    scene.mouse.down = false;
+  });
+  window.addEventListener('mouseleave', () => { scene.mouse.down = false; document.body.style.cursor = ''; });
+  document.addEventListener('wheel', e => {
+    if (e.target.closest('.modal-overlay') || e.target.closest('.lightbox-overlay')) return;
     e.preventDefault();
     scene.tZoom += e.deltaY * -1.8;
+    cameraDirty = true;
   }, { passive: false });
 }
 
 function bindTouchEvents() {
-  const w = scene.wrapper;
   let lastTX = 0, lastTY = 0, pinchDist = 0;
-  w.addEventListener('touchstart', e => {
+  document.addEventListener('touchstart', e => {
+    if (e.target.closest('.modal-overlay') || e.target.closest('.lightbox-overlay')) return;
     if (e.touches.length === 1) { lastTX = e.touches[0].clientX; lastTY = e.touches[0].clientY; }
     else if (e.touches.length === 2) {
       pinchDist = Math.hypot(
@@ -97,7 +105,8 @@ function bindTouchEvents() {
       );
     }
   }, { passive: true });
-  w.addEventListener('touchmove', e => {
+  document.addEventListener('touchmove', e => {
+    if (e.target.closest('.modal-overlay') || e.target.closest('.lightbox-overlay')) return;
     e.preventDefault();
     if (e.touches.length === 1) {
       scene.tPanX += e.touches[0].clientX - lastTX;
@@ -112,6 +121,7 @@ function bindTouchEvents() {
       scene.tZoom += (d - pinchDist) * 3;
       pinchDist = d;
     }
+    cameraDirty = true;
   }, { passive: false });
 }
 
@@ -177,27 +187,24 @@ function initCardDrag() {
 let photos = [];
 
 async function loadPhotos(albumId) {
-  const wrapper = document.getElementById('sceneWrapper');
-  wrapper.innerHTML = `<div class="empty-state"><div class="spinner"></div></div>`;
+  const world  = document.getElementById('world');
+  const status = document.getElementById('gallery-status');
+  world.innerHTML = '';
+  if (status) status.innerHTML = `<div class="spinner"></div>`;
 
   try {
     const res = await fetch(`api/photos.php?album_id=${albumId}`);
     if (!res.ok) throw new Error('Error al cargar fotos');
     photos = await res.json();
 
-    wrapper.innerHTML = `
-      <div class="scene-perspective">
-        <div class="scene-3d" id="scene3d"></div>
-      </div>
-    `;
+    if (status) status.innerHTML = '';
 
     if (photos.length === 0) {
-      wrapper.querySelector('.scene-3d').innerHTML = `
-        <div class="empty-state">
-          <div class="empty-icon" style="color:var(--text-2);opacity:0.45">${SVG.camera}</div>
-          <h3>Sin fotos aún</h3>
-          <p>Sube la primera foto con el botón de arriba</p>
-        </div>`;
+      if (status) status.innerHTML = `
+        <div class="empty-icon" style="color:var(--text-2);opacity:0.45">${SVG.camera}</div>
+        <h3>Sin fotos aún</h3>
+        <p>Sube la primera foto con el botón de arriba</p>
+      `;
     } else {
       photos.forEach(p => renderPhotoCard(p));
     }
@@ -206,15 +213,16 @@ async function loadPhotos(albumId) {
     initSearch();
     updatePhotoCount();
   } catch(e) {
-    wrapper.innerHTML = `<div class="empty-state"><p style="color:var(--danger)">${escHtml(e.message)}</p></div>`;
+    if (status) status.innerHTML = `<p style="color:var(--danger)">${escHtml(e.message)}</p>`;
   }
 }
 
 function renderPhotoCard(photo) {
-  const scene3d = document.getElementById('scene3d');
+  const world = document.getElementById('world');
   const card = document.createElement('div');
-  card.className      = 'photo-card';
-  card.dataset.id     = photo.id;
+  card.className        = 'photo-card';
+  card.style.willChange = 'transform';
+  card.dataset.id       = photo.id;
   card.dataset.tags   = photo.tags  || '';
   card.dataset.title  = photo.title || '';
 
@@ -246,6 +254,7 @@ function renderPhotoCard(photo) {
     dragLastY                  = e.clientY;
     dragMoved                  = false;
     document.body.style.cursor = 'grabbing';
+    e.preventDefault();  // evita selección de texto durante el drag
     e.stopPropagation(); // prevent scene pan
   });
 
@@ -255,7 +264,7 @@ function renderPhotoCard(photo) {
     openLightbox(photo);
   });
 
-  scene3d.appendChild(card);
+  world.appendChild(card);
 }
 
 function updatePhotoCount() {
