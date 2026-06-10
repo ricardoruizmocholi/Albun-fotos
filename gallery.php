@@ -1,5 +1,7 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__ . '/config/auth.php';
+requireLogin();
 require_once __DIR__ . '/config/db.php';
 
 $albumId = (int) ($_GET['album'] ?? 0);
@@ -13,6 +15,11 @@ try {
 } catch(Throwable $e) { $album = null; }
 
 if (!$album) { header('Location: index.php'); exit; }
+
+// Ownership check: must belong to current user unless admin
+if (!isAdmin() && (int)$album['user_id'] !== currentUserId()) {
+  header('Location: index.php'); exit;
+}
 
 $albumName  = htmlspecialchars($album['name'], ENT_QUOTES, 'UTF-8');
 $albumColor = preg_match('/^#[0-9a-fA-F]{6}$/', $album['color']) ? $album['color'] : '#0071e3';
@@ -40,6 +47,10 @@ $albumColor = preg_match('/^#[0-9a-fA-F]{6}$/', $album['color']) ? $album['color
   </a>
   <nav>
     <a href="index.php" class="nav-link">← Álbumes</a>
+    <?php if (isAdmin()): ?>
+    <a href="admin.php" class="nav-link">Admin</a>
+    <?php endif; ?>
+    <a href="logout.php" class="btn btn-ghost btn-sm">Cerrar sesión</a>
   </nav>
 </header>
 

@@ -1,3 +1,7 @@
+<?php
+require_once __DIR__ . '/config/auth.php';
+requireLogin();
+?>
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -15,6 +19,10 @@
   </a>
   <nav>
     <a href="index.php" class="nav-link">Álbumes</a>
+    <?php if (isAdmin()): ?>
+    <a href="admin.php" class="nav-link">Admin</a>
+    <?php endif; ?>
+    <a href="logout.php" class="btn btn-ghost btn-sm">Cerrar sesión</a>
   </nav>
 </header>
 

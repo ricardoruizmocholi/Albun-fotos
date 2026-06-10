@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
+  <defs>
+    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#11998e"/>
+      <stop offset="100%" stop-color="#38ef7d"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="600" fill="url(#g)"/>
+  <!-- tree silhouette -->
+  <ellipse cx="400" cy="220" rx="90" ry="80" fill="rgba(255,255,255,0.15)"/>
+  <ellipse cx="350" cy="260" rx="65" ry="60" fill="rgba(255,255,255,0.1)"/>
+  <ellipse cx="450" cy="260" rx="65" ry="60" fill="rgba(255,255,255,0.1)"/>
+  <rect x="385" y="300" width="30" height="90" fill="rgba(255,255,255,0.2)"/>
+  <!-- ground -->
+  <ellipse cx="400" cy="400" rx="260" ry="30" fill="rgba(255,255,255,0.08)"/>
+  <rect x="0" y="430" width="800" height="170" fill="rgba(0,0,0,0.1)"/>
+  <text x="400" y="490" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Arial,sans-serif" font-size="20" font-weight="600" fill="rgba(255,255,255,0.88)">Imagen de muestra</text>
+  <text x="400" y="520" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Arial,sans-serif" font-size="14" fill="rgba(255,255,255,0.52)">Sube tus fotos para verlas aquí</text>
+</svg>

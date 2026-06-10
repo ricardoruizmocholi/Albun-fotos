@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
+  <defs>
+    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0099f7"/>
+      <stop offset="100%" stop-color="#f11712"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="600" fill="url(#g)"/>
+  <!-- wave shapes -->
+  <path d="M0,340 C100,300 200,380 400,340 C600,300 700,380 800,340 L800,600 L0,600 Z" fill="rgba(255,255,255,0.12)"/>
+  <path d="M0,380 C120,340 240,420 400,380 C560,340 680,420 800,380 L800,600 L0,600 Z" fill="rgba(255,255,255,0.16)"/>
+  <path d="M0,420 C100,390 300,450 400,420 C500,390 700,450 800,420 L800,600 L0,600 Z" fill="rgba(255,255,255,0.1)"/>
+  <!-- photo icon -->
+  <g transform="translate(400,240)" fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="-58" y="-42" width="116" height="84" rx="10"/>
+    <circle cx="0" cy="0" r="26"/>
+    <circle cx="40" cy="-28" r="7" fill="rgba(255,255,255,0.5)" stroke="none"/>
+  </g>
+  <text x="400" y="498" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Arial,sans-serif" font-size="20" font-weight="600" fill="rgba(255,255,255,0.88)">Imagen de muestra</text>
+  <text x="400" y="528" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Arial,sans-serif" font-size="14" fill="rgba(255,255,255,0.52)">Sube tus fotos para verlas aquí</text>
+</svg>

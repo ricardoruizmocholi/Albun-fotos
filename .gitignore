@@ -1,0 +1,13 @@
+# User upload folders (auto-created per user, never committed)
+uploads/user_*/
+
+# Legacy flat uploads already in uploads/ (uploaded before per-user folders)
+uploads/*.jpg
+uploads/*.jpeg
+uploads/*.png
+uploads/*.webp
+uploads/*.gif
+
+# Env and credentials
+*.env
+config/db.php

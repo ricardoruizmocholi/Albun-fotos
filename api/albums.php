@@ -7,6 +7,8 @@ header('Access-Control-Allow-Headers: Content-Type');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(204); exit; }
 
+require_once __DIR__ . '/../config/auth.php';
+requireLogin();
 require_once __DIR__ . '/../config/db.php';
 
 function jsonOut(mixed $data, int $code = 200): never {
@@ -16,25 +18,39 @@ function jsonOut(mixed $data, int $code = 200): never {
 }
 
 $method = $_SERVER['REQUEST_METHOD'];
+$uid    = currentUserId();
+$admin  = isAdmin();
 
 try {
     $pdo = getPDO();
 
-    // ---- GET: listar álbumes con conteo de fotos ----
+    // ---- GET: list albums (own only) ----
     if ($method === 'GET') {
-        $stmt = $pdo->query(
-            'SELECT a.*, COUNT(p.id) AS photo_count
-             FROM albums a
-             LEFT JOIN photos p ON p.album_id = a.id
-             GROUP BY a.id
-             ORDER BY a.sort_order ASC, a.created_at DESC'
-        );
+        if ($admin) {
+            $stmt = $pdo->query(
+                'SELECT a.*, COUNT(p.id) AS photo_count
+                 FROM albums a
+                 LEFT JOIN photos p ON p.album_id = a.id
+                 GROUP BY a.id
+                 ORDER BY a.sort_order ASC, a.created_at DESC'
+            );
+        } else {
+            $stmt = $pdo->prepare(
+                'SELECT a.*, COUNT(p.id) AS photo_count
+                 FROM albums a
+                 LEFT JOIN photos p ON p.album_id = a.id
+                 WHERE a.user_id = ?
+                 GROUP BY a.id
+                 ORDER BY a.sort_order ASC, a.created_at DESC'
+            );
+            $stmt->execute([$uid]);
+        }
         jsonOut($stmt->fetchAll());
     }
 
-    // ---- POST: crear álbum / subir portada ----
+    // ---- POST: create album / upload cover ----
     if ($method === 'POST') {
-        // Subir imagen de portada
+        // Upload cover image
         if (($_GET['action'] ?? '') === 'upload_cover') {
             if (!isset($_FILES['cover']) || $_FILES['cover']['error'] !== UPLOAD_ERR_OK) {
                 jsonOut(['error' => 'Archivo requerido'], 422);
@@ -47,14 +63,16 @@ try {
             $mime    = mime_content_type($file['tmp_name']);
             if (!in_array($mime, $allowed, true)) jsonOut(['error' => 'Tipo no permitido'], 422);
 
-            $ext      = match($mime) { 'image/jpeg'=>'jpg','image/png'=>'png','image/webp'=>'webp',default=>'jpg' };
+            $ext     = match($mime) { 'image/jpeg'=>'jpg','image/png'=>'png','image/webp'=>'webp',default=>'jpg' };
+            $userDir = __DIR__ . '/../uploads/user_' . $uid . '/';
+            if (!is_dir($userDir)) mkdir($userDir, 0755, true);
             $filename = uniqid('cover_', true) . '.' . $ext;
-            $dest     = __DIR__ . '/../uploads/' . $filename;
+            $dest     = $userDir . $filename;
             if (!move_uploaded_file($file['tmp_name'], $dest)) jsonOut(['error' => 'Error al guardar archivo'], 500);
-            jsonOut(['url' => 'uploads/' . $filename]);
+            jsonOut(['url' => 'uploads/user_' . $uid . '/' . $filename]);
         }
 
-        // Crear álbum
+        // Create album
         $body  = json_decode(file_get_contents('php://input'), true) ?? [];
         $name  = trim($body['name']  ?? '');
         $emoji = trim($body['emoji'] ?? '');
@@ -63,8 +81,8 @@ try {
         if ($name === '') jsonOut(['error' => 'El nombre es obligatorio'], 422);
         if (!preg_match('/^#[0-9a-fA-F]{6}$/', $color)) $color = '#0071e3';
 
-        $stmt = $pdo->prepare('INSERT INTO albums (name, emoji, color) VALUES (?, ?, ?)');
-        $stmt->execute([$name, $emoji, $color]);
+        $stmt = $pdo->prepare('INSERT INTO albums (user_id, name, emoji, color) VALUES (?, ?, ?, ?)');
+        $stmt->execute([$uid, $name, $emoji, $color]);
         $id = (int) $pdo->lastInsertId();
 
         $album = $pdo->prepare('SELECT *, 0 AS photo_count FROM albums WHERE id = ?');
@@ -72,11 +90,22 @@ try {
         jsonOut($album->fetch(), 201);
     }
 
-    // ---- PATCH: reordenar álbumes ----
+    // ---- PATCH: reorder albums ----
     if ($method === 'PATCH' && ($_GET['action'] ?? '') === 'reorder') {
         $body  = json_decode(file_get_contents('php://input'), true) ?? [];
         $order = array_values(array_filter(array_map('intval', $body['order'] ?? []), fn($v) => $v > 0));
         if (empty($order)) jsonOut(['error' => 'Order vacío'], 422);
+
+        // Verify all IDs belong to current user (unless admin)
+        if (!$admin) {
+            $placeholders = implode(',', array_fill(0, count($order), '?'));
+            $check = $pdo->prepare(
+                "SELECT COUNT(*) FROM albums WHERE id IN ($placeholders) AND user_id != ?"
+            );
+            $check->execute([...$order, $uid]);
+            if ((int)$check->fetchColumn() > 0) jsonOut(['error' => 'Acceso denegado'], 403);
+        }
+
         $stmt = $pdo->prepare('UPDATE albums SET sort_order = ? WHERE id = ?');
         foreach ($order as $i => $id) {
             $stmt->execute([$i, $id]);
@@ -84,18 +113,25 @@ try {
         jsonOut(['ok' => true]);
     }
 
-    // ---- PATCH: editar álbum ----
+    // ---- PATCH: edit album ----
     if ($method === 'PATCH') {
-        $body      = json_decode(file_get_contents('php://input'), true) ?? [];
-        $id        = (int) ($body['id']    ?? 0);
-        $name      = trim($body['name']    ?? '');
-        $color     = trim($body['color']   ?? '#0071e3');
-        $hasCover  = array_key_exists('cover_url', $body);
-        $coverUrl  = $hasCover ? trim($body['cover_url']) : null;
+        $body     = json_decode(file_get_contents('php://input'), true) ?? [];
+        $id       = (int) ($body['id']    ?? 0);
+        $name     = trim($body['name']    ?? '');
+        $color    = trim($body['color']   ?? '#0071e3');
+        $hasCover = array_key_exists('cover_url', $body);
+        $coverUrl = $hasCover ? trim($body['cover_url']) : null;
 
         if ($id <= 0) jsonOut(['error' => 'ID inválido'], 422);
         if ($name === '') jsonOut(['error' => 'El nombre es obligatorio'], 422);
         if (!preg_match('/^#[0-9a-fA-F]{6}$/', $color)) $color = '#0071e3';
+
+        // Ownership check
+        if (!$admin) {
+            $own = $pdo->prepare('SELECT id FROM albums WHERE id = ? AND user_id = ?');
+            $own->execute([$id, $uid]);
+            if (!$own->fetch()) jsonOut(['error' => 'Álbum no encontrado'], 404);
+        }
 
         if ($hasCover) {
             $pdo->prepare('UPDATE albums SET name = ?, color = ?, cover_url = ? WHERE id = ?')
@@ -114,10 +150,17 @@ try {
         jsonOut($album->fetch());
     }
 
-    // ---- DELETE: eliminar álbum (cascade borra fotos) ----
+    // ---- DELETE: delete album ----
     if ($method === 'DELETE') {
         $id = (int) ($_GET['id'] ?? 0);
         if ($id <= 0) jsonOut(['error' => 'ID inválido'], 422);
+
+        // Ownership check
+        if (!$admin) {
+            $own = $pdo->prepare('SELECT id FROM albums WHERE id = ? AND user_id = ?');
+            $own->execute([$id, $uid]);
+            if (!$own->fetch()) jsonOut(['error' => 'Álbum no encontrado'], 404);
+        }
 
         $photos = $pdo->prepare('SELECT url FROM photos WHERE album_id = ?');
         $photos->execute([$id]);
@@ -130,7 +173,6 @@ try {
             }
         }
 
-        // Borrar cover si es local
         $albumRow = $pdo->prepare('SELECT cover_url FROM albums WHERE id = ?');
         $albumRow->execute([$id]);
         $al = $albumRow->fetch();
