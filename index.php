@@ -110,6 +110,11 @@ requireLogin();
 <!-- ---- Toasts ---- -->
 <div class="toast-container" id="toastContainer"></div>
 
+<footer class="site-footer-links">
+  <a href="privacy.php">Política de privacidad</a>
+  <a href="terms.php">Términos de uso</a>
+</footer>
+
 <script src="js/albums.js"></script>
 </body>
 </html>

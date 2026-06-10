@@ -23,6 +23,17 @@ function fetchUsers(PDO $pdo): array {
     )->fetchAll();
 }
 
+function renderStorageCell(float $usedMb, int $limitMb): string {
+    $usedStr = number_format($usedMb, 2);
+    if ($limitMb === 0) {
+        return $usedStr . ' MB / ∞';
+    }
+    $pct    = min(100, ($usedMb / $limitMb) * 100);
+    $barCls = $pct >= 90 ? ' danger' : '';
+    $bar    = '<div class="storage-bar"><div class="storage-bar-fill' . $barCls . '" style="width:' . $pct . '%"></div></div>';
+    return $usedStr . ' MB / ' . $limitMb . ' MB' . $bar;
+}
+
 $pdo = getPDO();
 
 // ---- GET ?api: return user list as JSON ----
@@ -218,7 +229,7 @@ $myId        = currentUserId();
             <td><strong><?= htmlspecialchars($u['username'], ENT_QUOTES, 'UTF-8') ?></strong></td>
             <td><span class="role-badge <?= $roleCls ?>"><?= htmlspecialchars($u['role'], ENT_QUOTES, 'UTF-8') ?></span></td>
             <td><?= $limitLbl ?></td>
-            <td><?= $u['used_mb'] ?? 0 ?></td>
+            <td><?= renderStorageCell((float)($u['used_mb'] ?? 0), (int)$u['storage_limit_mb']) ?></td>
             <td><?= (int)($u['album_count'] ?? 0) ?></td>
             <td><?= $created ?></td>
             <td><div class="td-actions">
@@ -239,6 +250,25 @@ $myId        = currentUserId();
         </tbody>
       </table>
     </div>
+  </div>
+
+  <div class="admin-header-row" style="margin-top:40px">
+    <div>
+      <h2 class="page-title" style="font-size:24px;margin-bottom:4px">Galería de contenido</h2>
+      <p class="page-subtitle">Explora y modera las fotos de todos los usuarios</p>
+    </div>
+    <div class="form-group" style="margin-bottom:0;min-width:240px">
+      <select id="galleryUserFilter" class="form-select">
+        <option value="0">— Todos los usuarios —</option>
+        <?php foreach ($users as $u): ?>
+        <option value="<?= (int)$u['id'] ?>"><?= htmlspecialchars($u['username'], ENT_QUOTES, 'UTF-8') ?></option>
+        <?php endforeach; ?>
+      </select>
+    </div>
+  </div>
+
+  <div class="glass admin-card">
+    <div id="adminGalleryGrid" class="admin-gallery-grid"></div>
   </div>
 </main>
 
@@ -284,6 +314,22 @@ $myId        = currentUserId();
 <!-- ---- Toasts ---- -->
 <div class="toast-container" id="toastContainer"></div>
 
+<!-- ---- Lightbox (admin gallery) ---- -->
+<div class="lightbox-overlay" id="adminLightboxOverlay">
+  <div class="lightbox-top-actions">
+    <button class="btn-lb-action btn-lb-close" id="adminLightboxClose" aria-label="Cerrar">&#x2715;</button>
+  </div>
+  <div class="lightbox-inner">
+    <img id="adminLightboxImg" src="" alt="">
+    <div class="lightbox-title" id="adminLightboxTitle"></div>
+  </div>
+</div>
+
+<footer class="site-footer-links">
+  <a href="privacy.php">Política de privacidad</a>
+  <a href="terms.php">Términos de uso</a>
+</footer>
+
 <script>
 const MY_ID = <?= $myId ?>;
 
@@ -291,6 +337,14 @@ const MY_ID = <?= $myId ?>;
 function renderRoleBadge(role) {
   const cls = role === 'admin' ? 'role-admin' : 'role-user';
   return `<span class="role-badge ${cls}">${escHtml(role)}</span>`;
+}
+
+function renderStorageCell(usedMb, limitMb) {
+  const used = Number(usedMb || 0).toFixed(2);
+  if (limitMb == 0) return `${used} MB / &#8734;`;
+  const pct = Math.min(100, (Number(usedMb || 0) / limitMb) * 100);
+  const cls = pct >= 90 ? ' danger' : '';
+  return `${used} MB / ${limitMb} MB<div class="storage-bar"><div class="storage-bar-fill${cls}" style="width:${pct}%"></div></div>`;
 }
 
 function renderRow(u) {
@@ -302,7 +356,7 @@ function renderRow(u) {
     <td><strong>${escHtml(u.username)}</strong></td>
     <td>${renderRoleBadge(u.role)}</td>
     <td>${limitLbl}</td>
-    <td>${u.used_mb ?? 0}</td>
+    <td>${renderStorageCell(u.used_mb, u.storage_limit_mb)}</td>
     <td>${u.album_count ?? 0}</td>
     <td>${created}</td>
     <td><div class="td-actions">
@@ -453,6 +507,93 @@ function showToast(msg, type = 'success') {
   c.appendChild(t);
   setTimeout(() => { t.classList.add('hiding'); setTimeout(() => t.remove(), 280); }, 3000);
 }
+
+// ---- Content gallery ----
+function formatBytes(bytes) {
+  bytes = Number(bytes) || 0;
+  if (bytes === 0) return '–';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+}
+
+async function loadAdminGallery(userId) {
+  const grid = document.getElementById('adminGalleryGrid');
+  grid.innerHTML = '<p style="grid-column:1/-1;color:var(--text-2);padding:20px 0">Cargando…</p>';
+  try {
+    const res    = await fetch(`api/admin_gallery.php?user_id=${userId}`);
+    const albums = await res.json();
+    if (!res.ok) throw new Error(albums.error || 'Error al cargar la galería');
+    renderAdminGallery(albums);
+  } catch (e) {
+    grid.innerHTML = `<p style="grid-column:1/-1;color:var(--danger);padding:20px 0">${escHtml(e.message)}</p>`;
+  }
+}
+
+function renderAdminGallery(albums) {
+  const grid = document.getElementById('adminGalleryGrid');
+  grid.innerHTML = '';
+  let count = 0;
+
+  albums.forEach(album => {
+    (album.photos || []).forEach(photo => {
+      count++;
+      const thumb = document.createElement('div');
+      thumb.className = 'admin-thumb';
+      thumb.innerHTML = `
+        <img src="${escAttr(photo.url)}" alt="" loading="lazy">
+        <div class="admin-thumb-meta">👤 ${escHtml(album.username)} · 📁 ${escHtml(album.name)} · 📦 ${formatBytes(photo.file_size)}</div>
+        <button class="thumb-delete" type="button" title="Eliminar foto">🗑</button>
+      `;
+      thumb.addEventListener('click', e => {
+        if (e.target.closest('.thumb-delete')) return;
+        openAdminLightbox(photo, album);
+      });
+      thumb.querySelector('.thumb-delete').addEventListener('click', async e => {
+        e.stopPropagation();
+        if (!confirm('¿Eliminar esta foto?')) return;
+        try {
+          const res  = await fetch(`api/photos.php?id=${photo.id}`, { method: 'DELETE' });
+          const data = await res.json();
+          if (!res.ok || data.error) { showToast(data.error || 'Error al eliminar', 'error'); return; }
+          thumb.remove();
+          showToast('Foto eliminada');
+        } catch {
+          showToast('Error de red', 'error');
+        }
+      });
+      grid.appendChild(thumb);
+    });
+  });
+
+  if (count === 0) {
+    grid.innerHTML = '<p style="grid-column:1/-1;color:var(--text-2);padding:20px 0">No hay fotos para mostrar</p>';
+  }
+}
+
+// ---- Admin lightbox ----
+function openAdminLightbox(photo, album) {
+  document.getElementById('adminLightboxImg').src           = photo.url;
+  document.getElementById('adminLightboxImg').alt           = photo.title || '';
+  document.getElementById('adminLightboxTitle').textContent = photo.title || `${album.username} — ${album.name}`;
+  document.getElementById('adminLightboxOverlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closeAdminLightbox() {
+  document.getElementById('adminLightboxOverlay').classList.remove('open');
+  document.body.style.overflow = '';
+  setTimeout(() => { document.getElementById('adminLightboxImg').src = ''; }, 350);
+}
+document.getElementById('adminLightboxClose').addEventListener('click', closeAdminLightbox);
+document.getElementById('adminLightboxOverlay').addEventListener('click', function(e) {
+  if (e.target === this) closeAdminLightbox();
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAdminLightbox(); });
+
+// ---- Gallery filter + initial load ----
+document.getElementById('galleryUserFilter').addEventListener('change', e => {
+  loadAdminGallery(parseInt(e.target.value, 10) || 0);
+});
+loadAdminGallery(0);
 </script>
 
 </body>

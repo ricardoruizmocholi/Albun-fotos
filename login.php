@@ -41,8 +41,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <title>Iniciar sesión — Mi Galería</title>
   <link rel="stylesheet" href="css/style.css">
   <style>
-    body { display:flex; align-items:center; justify-content:center; min-height:100vh; }
-    .login-wrap { width:100%; max-width:400px; padding:40px 36px; }
+    body.login-body { display:flex; align-items:center; justify-content:center; min-height:100vh; }
+    .login-wrap { width:100%; max-width:400px; padding:40px 36px; position:relative; z-index:1; }
     .login-logo  { display:flex; align-items:center; gap:8px; font-size:20px; font-weight:700; letter-spacing:-0.5px; margin-bottom:32px; }
     .login-title { font-size:26px; font-weight:700; letter-spacing:-0.5px; margin-bottom:6px; }
     .login-sub   { font-size:14px; color:var(--text-2); margin-bottom:28px; }
@@ -51,7 +51,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     .form-input  { user-select:text; -webkit-user-select:text; }
   </style>
 </head>
-<body>
+<body class="login-body">
+
+<canvas id="bg-dots" style="position:fixed;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;"></canvas>
 
 <div class="glass login-wrap">
   <div class="login-logo">
@@ -84,6 +86,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <button type="submit" class="btn btn-primary login-btn">Iniciar sesión</button>
   </form>
 </div>
+
+<footer class="site-footer-links">
+  <a href="privacy.php">Política de privacidad</a>
+  <a href="terms.php">Términos de uso</a>
+</footer>
+
+<script type="module">
+  import { init } from "./canvas-bg-dots.js";
+  init(document.getElementById("bg-dots"));
+</script>
 
 </body>
 </html>

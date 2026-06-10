@@ -43,18 +43,23 @@ const colorRow  = document.getElementById('colorRow');
 
 // ---- Render albums ----
 function renderAlbums() {
-  grid.querySelectorAll('.album-card, .empty-placeholder').forEach(c => c.remove());
+  grid.querySelectorAll('.album-card, .empty-state').forEach(c => c.remove());
+
+  const newBtn = grid.querySelector('.album-new-card');
 
   if (albums.length === 0) {
     const empty = document.createElement('div');
-    empty.className = 'empty-placeholder';
-    empty.style.cssText = 'grid-column:1/-1;text-align:center;padding:40px 0;color:var(--text-2);font-size:14px;';
-    empty.textContent = 'Aún no hay álbumes. Crea el primero.';
-    grid.insertBefore(empty, grid.firstChild);
+    empty.className = 'empty-state';
+    empty.style.cssText = 'grid-column:1/-1;padding:60px 0;';
+    empty.innerHTML = `
+      <div class="empty-icon">📂</div>
+      <h3>Aún no tienes álbumes</h3>
+      <p>Crea tu primer álbum con el botón +</p>
+    `;
+    grid.insertBefore(empty, newBtn);
     return;
   }
 
-  const newBtn = grid.querySelector('.album-new-card');
   albums.forEach(album => {
     const a = document.createElement('a');
     a.className = 'album-card';

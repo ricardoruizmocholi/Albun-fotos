@@ -178,11 +178,12 @@ try {
             if (!in_array($mime, $allowed, true)) jsonOut(['error' => 'Tipo no permitido'], 422);
 
             // Quota check
-            $userRow = $pdo->prepare('SELECT storage_limit_mb FROM users WHERE id = ?');
+            $userRow = $pdo->prepare('SELECT storage_limit_mb, role FROM users WHERE id = ?');
             $userRow->execute([currentUserId()]);
-            $limitMb = (int)($userRow->fetchColumn() ?? 0);
+            $user    = $userRow->fetch();
+            $limitMb = (int)($user['storage_limit_mb'] ?? 0);
 
-            if ($limitMb > 0) {
+            if ($user['role'] !== 'admin' && $limitMb > 0) {
                 $usageStmt = $pdo->prepare(
                     'SELECT COALESCE(SUM(p.file_size), 0)
                      FROM photos p
@@ -190,11 +191,13 @@ try {
                      WHERE a.user_id = ?'
                 );
                 $usageStmt->execute([currentUserId()]);
-                $usedBytes  = (int)$usageStmt->fetchColumn();
-                $limitBytes = $limitMb * 1024 * 1024;
+                $usedBytes   = (int)$usageStmt->fetchColumn();
+                $limitBytes  = $limitMb * 1024 * 1024;
+                $newFileSize = (int) $file['size'];
 
-                if (($usedBytes + $file['size']) > $limitBytes) {
-                    jsonOut(['error' => "Has alcanzado tu límite de almacenamiento ({$limitMb}mb)"], 422);
+                if (($usedBytes + $newFileSize) > $limitBytes) {
+                    $usedMb = round($usedBytes / 1024 / 1024, 1);
+                    jsonOut(['error' => "Has alcanzado tu límite de almacenamiento. Usado: {$usedMb} MB de {$limitMb} MB."], 422);
                 }
             }
 
@@ -210,7 +213,7 @@ try {
             $dest     = $userDir . $filename;
             if (!move_uploaded_file($file['tmp_name'], $dest)) jsonOut(['error' => 'Error al guardar archivo'], 500);
             $url      = 'uploads/user_' . currentUserId() . '/' . $filename;
-            $fileSize = $file['size'];
+            $fileSize = (int) $file['size'];
 
         } elseif (!empty($_POST['url'])) {
             $url = filter_var(trim($_POST['url']), FILTER_SANITIZE_URL);
